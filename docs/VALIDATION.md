@@ -1,6 +1,6 @@
 # GitHub 독립 관리 전환 재검증 — 2026-11-10 14:38 이후 (KST)
 
-현재 코드만 `codex/step1-foundation` 작업 브랜치로 분리했습니다. 기존 origin `https://github.com/zaen92/bl_new.git`의 읽기 접근이 확인되었고 원격에는 브랜치가 없었습니다. 다른 저장소 코드 가져오기, 병합, main 변경, 파일 구조 변경, 앱 공개 배포, STEP 2 개발은 하지 않았습니다.
+현재 코드만 `codex/step1-foundation` 작업 브랜치로 분리했습니다. 기존 origin `https://github.com/zaen92/bl_new.git`의 읽기 접근이 확인되었고 원격에는 브랜치가 없었습니다. 최초 코드 커밋 `2ab6b1a592dc30799323a787747b0aae22e1956f`의 푸시가 성공했고 원격 브랜치 SHA 일치도 확인했습니다. 다른 저장소 코드 가져오기, 병합, main 변경, 파일 구조 변경, 앱 공개 배포, STEP 2 개발은 하지 않았습니다.
 
 이번 실행 결과:
 
