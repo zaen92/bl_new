@@ -21,3 +21,16 @@ test('original Korean prompt, volume, photo placement and JSON contract retained
  const prompt=buildPrompt({title:'서울 카페',memo:'메모',content:'직접 경험',placeInfo:'주소',type:'카페',volume:'long',photos:['photo']});
  for(const fragment of ['1800~2100자','서울 카페','직접 경험','여행블로거 잰잇','[사진1]','"body"','"hashtags"','"reel"','"thumbnail"'])assert.ok(prompt.includes(fragment),fragment);
 });
+
+test('production SDK boundary serializes native serverTimestamp in Firestore writes',async()=>{
+ const {initializeApp,deleteApp,getFirestore,FieldValue,Timestamp}=await import('../functions/src/admin.js');
+ const app=initializeApp({projectId:'demo-jaeinit'},'timestamp-regression');
+ try{
+  const db=getFirestore(app);
+  // Exercise the real Admin SDK write validator. No network/commit is needed
+  // to reproduce the original mixed-instance ServerTimestampTransform failure.
+  assert.doesNotThrow(()=>db.batch().create(db.doc('regression/timestamp'),{
+   createdAt:FieldValue.serverTimestamp(), knownTimestamp:Timestamp.fromMillis(0)
+  }));
+ }finally{await deleteApp(app);}
+});

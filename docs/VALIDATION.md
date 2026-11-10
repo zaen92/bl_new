@@ -1,3 +1,82 @@
+# SDK 객체 충돌 수정 및 CA 재검증 — 2026-11-10 (KST)
+
+요청 범위: STEP 1만 수정. 기존 `codex/step1-foundation` 브랜치를 사용하고 다른 프로젝트 코드/병합, UI/CSS 변경, 실제 Firebase 배포, STEP 2·결제 개발은 하지 않았습니다.
+
+## 1. SDK 충돌 원인과 수정
+
+모듈 해석을 직접 조사한 결과:
+
+| 소비자 | firebase-admin | @google-cloud/firestore | 실제 경로 |
+|---|---|---|---|
+| 루트 테스트 | 13.10.0 | 7.11.6 | `/workspace/bl_new/node_modules/...` |
+| Functions 서버 | 13.10.0 | 7.11.6 | `/workspace/bl_new/functions/node_modules/...` |
+
+동일 버전이라도 별도 경로로 로드하면 `FieldValue` 생성자가 다릅니다. 두 방향의 `serverTimestamp() instanceof 상대SDK.FieldValue`가 모두 false임을 확인했습니다. 기존 테스트는 루트 SDK의 `getFirestore()`를 사용하고, 호출된 `profile.js`/`posts.js`는 functions SDK의 `FieldValue.serverTimestamp()`를 사용했습니다.
+
+실제 Admin SDK의 로컬 WriteBatch 문서 검증기에 이 조합을 전달하여 다음 오류를 재현했습니다:
+
+```text
+Couldn't serialize object of type "ServerTimestampTransform" (found in field "createdAt").
+Firestore doesn't support JavaScript objects with custom prototypes.
+```
+
+수정은 `functions/src/admin.js`를 공통 SDK import 경계로 추가한 것입니다. 서버 진입점·프로필·글 서비스·서버 통합 테스트·seed가 모두 이 모듈에서 `initializeApp`, `getFirestore`, `getAuth`, `FieldValue`, `Timestamp`를 가져옵니다. 실제 Functions 배포 패키지 안에서 해석되므로 루트 node_modules에 의존하지 않습니다. 버전만 맞추거나 모듈 캐시를 우회하는 방법은 사용하지 않았습니다.
+
+같은 경계를 사용하는 실제 WriteBatch 문서 검증은 네이티브 `serverTimestamp()`/`Timestamp`를 직렬화 오류 없이 수락했습니다. 이 검증을 단위 회귀 테스트로 추가했습니다. **이는 네트워크 없는 실제 SDK 쓰기 검증이며 Firestore 커밋/트랜잭션 통과를 의미하지 않습니다.** 타임스탬프 문자열 변환·mock SDK·보안 검증 생략은 없습니다. 기존 +2 지급, HMAC 지급 기록, 원장, 트랜잭션 로직은 import 외에는 바꾸지 않았습니다.
+
+서버 테스트는 직접 초기화 **24건**, 동일 이메일 다른 UID **24건**, 실제 Callable 초기화 **24건**으로 보강했습니다. 잔액 2·원장 1개·balanceAfter 2 및 user/claim/ledger의 동일 서버 Timestamp, 글 생성·수정 Timestamp 검증도 추가했습니다. 아래 제약으로 실제 서버 테스트는 아직 통과 확인하지 못했습니다.
+
+## 2. Chromium CA 신뢰 확인
+
+플랫폼 제공 공개 CA `/usr/local/share/ca-certificates/environment-proxy-ca.crt`만 대상으로 조사했습니다. 시스템 CA bundle의 `openssl verify` 결과 OK, `CA:TRUE`, 유효기간 2024-12-03 ~ 2034-12-01입니다.
+
+SHA-256:
+`c71b4d1e9d7775c538c688ab10cea9ce417d7312e89838f9d15ff73256cd7fc3`
+
+사용자 NSS DB: `/home/agent/.pki/nssdb`. `certutil`이 있고 파일은 해당 사용자 소유입니다. 승인된 범위에서 같은 CA 등록을 시도했지만 NSS는 이미 있는 동일 인증서를 재사용했습니다. 기존 닉네임 **`OpenAI-nebula-dns`**, 신뢰 **`C,,`** 인증서의 DER SHA-256이 위 지문과 정확히 같습니다. 따라서 새 닉네임이 나타나지 않는 것을 등록 실패나 미신뢰로 판단하면 안 됩니다. 기존 신뢰를 넓히거나 다른 인증서를 추가할 필요가 없습니다. 재현 가능한 읽기 전용 지문/시스템 체인/NSS SSL 신뢰 진단 `scripts/check-browser-ca.py`를 추가했고 통과했습니다.
+
+Chromium 프로세스를 새로 시작해 재검증했습니다. `ignoreHTTPSErrors`, `--ignore-certificate-errors`, `NODE_TLS_REJECT_UNAUTHORIZED=0`, 검증 없는 다운로드를 사용하지 않았습니다. 운영 환경의 신뢰 저장소를 변경하지 않았습니다.
+
+사용자가 보고한 `net::ERR_CERT_AUTHORITY_INVALID`는 이번 실행에서는 재현되지 않았습니다. 현재 Google 요청의 실제 오류는 **`net::ERR_TUNNEL_CONNECTION_FAILED`**이며, TLS 핸드셰이크 이전의 프록시 차단입니다. CA 신뢰 진단 통과를 Google 로그인 통과로 표시하지 않습니다.
+
+## 3. 수정 후 전체 회귀 결과
+
+| 명령 / 검증 | 통과 | 실패 | 미실행 | 결과 |
+|---|---:|---:|---:|---|
+| `npm run build` | 빌드 통과 | 0 | 0 | 기존 번들 크기 경고만 있음. 웹 결과 JS/CSS 해시도 이전과 동일 |
+| `npm run test:unit` | **4** | 0 | 0 | 기존 3개 + 실제 SDK 서버 Timestamp 직렬화 회귀 |
+| `npm run test:ui` | **4** | 0 | 0 | 기존 UI·원문·사진·기기 저장·JSON 이동 회귀 |
+| `npm run test:auth` | 이메일 **1** | Google **1** | 0 | 새 Chromium 실행. SDK 프록시 터널 차단으로 팝업 미발생 |
+| `npm test` | 0 | 0 | **11** | 명령 exit 1: 공식 Firestore JAR 다운로드 403, 보안 4+서버 7개 본문 시작 전 중단 |
+| 요청한 서버 4개 선택 재실행 | 0 | 0 | **4** | 별도 선택 명령도 JAR 403. 위 11개에 포함되며 중복 집계하지 않음 |
+| `python scripts/check-browser-ca.py` | 진단 통과 | 0 | 0 | 시스템 체인 및 사용자 NSS의 동일 CA·SSL 신뢰 확인 |
+
+자동 테스트 총 **9 통과 / 1 실패 / 11 미실행**입니다. 빌드·CA 진단은 별도입니다. 실제 Google OAuth는 테스트 프로젝트 설정이 없어 별도 미실행입니다.
+
+선택 재실행한 4개는 동시 회원 초기화, 탈퇴 후 동일 이메일 재가입 방지, 동일 이메일 동시 지급 방지, 글·사진 저장입니다. `--test-name-pattern='concurrent/repeated|deletion/re-registration|24 distinct UIDs|cloud post preserves' tests/server.test.js`로 지정했으나 Emulator 준비 단계에서 중단됐습니다. 성공이나 실제 테스트 실패로 세지 않았습니다.
+
+무료 2크레딧·24건 동시 중복 방지·재가입·타인 접근 차단·실제 서버 트랜잭션의 원자성은 수정된 테스트 정의가 있으며, **실제 Emulator 결과로는 여전히 미검증**입니다. UI 테스트나 로컬 SDK 회귀로 대체해 통과 처리하지 않았습니다. 모든 필수 테스트가 통과하지 않았으므로 **STEP 1 검증 완료가 아닙니다.**
+
+## 4. 이번 실행의 제약과 증거
+
+사용자의 다른 진단에서 요청이 성공했다는 보고와 달리, 이번 연결된 실행 환경의 공식 CLI는 `cloud-firestore-emulator-v1.19.8.jar`에 `403 Domain forbidden`을 반환했고 캐시가 비어 있습니다. 승인된 live sidecar 상태 조회에서도 `policy.http.mode=allowlist`, `allowed_domains=[]`였습니다. 기존 domain 설정 초안을 다시 쓰거나 사용자에게 같은 네트워크 변경 안내를 반복하지 않았습니다. 테스트 데이터를 모방하거나 비공식 JAR로 대체하지 않았습니다. 현재 환경에서 관찰한 오류와 사용자가 보고한 다른 실행 결과를 구분합니다.
+
+로그는 Git 제외 `.local/sdk-{before,build-final,unit-final,ui-final,auth-final,full-final,targeted-final}.log`, `.local/ca-{before,after,same-process}.log`에 보관했습니다. Auth 로그는 테스트 인증 링크가 포함되어 Git에 넣지 않습니다.
+
+변경 파일:
+
+- `functions/src/admin.js` 신규: SDK 공통 경계.
+- `functions/src/index.js`, `profile.js`, `posts.js`: 공통 SDK import.
+- `scripts/seed-packages.js`: 서버와 같은 SDK 사용.
+- `scripts/check-browser-ca.py` 신규: 환경 CA/NSS 읽기 전용 진단.
+- `tests/server.test.js`: 동일 SDK, 24건 동시성, 네이티브 Timestamp·원자 커밋 assertion.
+- `tests/unit.test.js`: 실제 SDK Timestamp 쓰기 검증 회귀.
+- `README.md`, `docs/VALIDATION.md`: 원인·사용법·검증 결과.
+
+---
+
+# 이전 작업 기록 (아래 결과는 해당 시점 기준)
+
 # GitHub 독립 관리 전환 재검증 — 2026-11-10 14:38 이후 (KST)
 
 현재 코드만 `codex/step1-foundation` 작업 브랜치로 분리했습니다. 기존 origin `https://github.com/zaen92/bl_new.git`의 읽기 접근이 확인되었고 원격에는 브랜치가 없었습니다. 최초 코드 커밋 `2ab6b1a592dc30799323a787747b0aae22e1956f`의 푸시가 성공했고 원격 브랜치 SHA 일치도 확인했습니다. 다른 저장소 코드 가져오기, 병합, main 변경, 파일 구조 변경, 앱 공개 배포, STEP 2 개발은 하지 않았습니다.

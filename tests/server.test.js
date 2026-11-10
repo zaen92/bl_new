@@ -1,9 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {initializeApp} from 'firebase-admin/app';
-import {getFirestore} from 'firebase-admin/firestore';
-import {getAuth} from 'firebase-admin/auth';
-import {provisionProfile} from '../functions/src/profile.js';
+import {initializeApp,getFirestore,getAuth,Timestamp} from '../functions/src/admin.js';
+import {provisionProfile,signupIdentity} from '../functions/src/profile.js';
 import {saveOwnedPost,loadOwnedPost} from '../functions/src/posts.js';
 if(!process.env.FIRESTORE_EMULATOR_HOST || !process.env.FIREBASE_AUTH_EMULATOR_HOST)throw new Error('Run npm test with emulators.');
 const app=initializeApp({projectId:'demo-jaeinit'});
@@ -13,11 +11,18 @@ const identity=uid=>({uid,email:`${uid}@example.test`,emailVerified:true,display
 const post={title:'서울 카페',type:'카페',volume:'normal',date:'오늘',data:{title_1:'서울 카페',body:'사진 포함 본문 [사진1]',hashtags:['#서울']},form:{ti:'제목',mi:'메모',ci:'직접 쓴 내용',ii:'주소'},imgs:['data:image/png;base64,'+'YQ=='.repeat(1)]};
 test('concurrent/repeated initializations grant exactly 2 once and one ledger entry',async()=>{
  const user=identity('concurrent');
- const results=await Promise.all(Array.from({length:12},()=>provisionProfile(db,user,key)));
+ const results=await Promise.all(Array.from({length:24},()=>provisionProfile(db,user,key)));
  assert.equal(results.filter(r=>r.created).length,1);
  assert.equal((await db.doc('users/concurrent').get()).data().credits,2);
  const ledger=await db.collection('creditLedger').where('uid','==',user.uid).get();
  assert.equal(ledger.size,1);assert.equal(ledger.docs[0].data().delta,2);
+ assert.ok(ledger.docs[0].data().createdAt instanceof Timestamp);
+ assert.ok((await db.doc(`users/${user.uid ?? user.localId}`).get()).data().createdAt instanceof Timestamp);
+ assert.equal(ledger.docs[0].data().balanceAfter,2);
+ const profile=(await db.doc('users/concurrent').get()).data();
+ const claim=(await db.doc(`signupClaims/${signupIdentity(user.email,key)}`).get()).data();
+ assert.ok(profile.createdAt.isEqual(ledger.docs[0].data().createdAt));
+ assert.ok(profile.createdAt.isEqual(claim.createdAt));
  await provisionProfile(db,user,key);
  assert.equal((await db.doc('users/concurrent').get()).data().credits,2);
 });
@@ -31,8 +36,8 @@ test('deletion/re-registration with same verified email, case/space variants can
  assert.equal((await db.doc('users/rejoined').get()).data().credits,0);
  assert.equal((await db.collection('creditLedger').where('uid','==','rejoined').get()).size,0);
 });
-test('two distinct UIDs concurrently sharing verified email receive 2 credits total',async()=>{
- const users=['race-a','race-b'].map(uid=>({...identity(uid),email:'shared@example.test'}));
+test('24 distinct UIDs concurrently sharing verified email receive 2 credits total',async()=>{
+ const users=Array.from({length:24},(_,i)=>`race-${i}`).map(uid=>({...identity(uid),email:'shared@example.test'}));
  const results=await Promise.all(users.map(user=>provisionProfile(db,user,key)));
  assert.equal(results.reduce((sum,r)=>sum+r.credits,0),2);
 });
@@ -46,6 +51,7 @@ test('cloud post preserves source, result and chunked photos; idempotency, CAS a
  assert.deepEqual(await saveOwnedPost(db,'writer',payload),{id:'post-test',version:1});
  assert.deepEqual(await saveOwnedPost(db,'writer',payload),{id:'post-test',version:1});
  const loaded=await loadOwnedPost(db,'writer','post-test');
+ assert.ok(loaded.createdAt instanceof Timestamp);assert.ok(loaded.updatedAt instanceof Timestamp);
  assert.deepEqual(loaded.imgs,post.imgs);assert.deepEqual(loaded.form,post.form);assert.equal(loaded.data.body,post.data.body);
  await assert.rejects(loadOwnedPost(db,'intruder','post-test'),{code:'permission-denied'});
  await assert.rejects(saveOwnedPost(db,'intruder',payload),{code:'permission-denied'});
@@ -73,11 +79,14 @@ test('actual callable: unauthenticated/unverified rejected; verified provisionin
  const email='callable@example.test';const user=await signup(email);
  assert.equal((await callable('ensureProfile',user.idToken)).error.status,'FAILED_PRECONDITION');
  await auth.updateUser(user.localId,{emailVerified:true});
- const initial=await Promise.all(Array.from({length:8},()=>callable('ensureProfile',user.idToken,{credits:999})));
+ const initial=await Promise.all(Array.from({length:24},()=>callable('ensureProfile',user.idToken,{credits:999})));
  assert.equal(initial.filter(r=>r.result?.created).length,1);
  for(const result of initial)assert.equal(result.result?.credits,2,JSON.stringify(result));
  const ledger=await db.collection('creditLedger').where('uid','==',user.localId).get();
  assert.equal(ledger.size,1);assert.equal(ledger.docs[0].data().delta,2);
+ assert.ok(ledger.docs[0].data().createdAt instanceof Timestamp);
+ assert.ok((await db.doc(`users/${user.uid ?? user.localId}`).get()).data().createdAt instanceof Timestamp);
+ assert.equal(ledger.docs[0].data().balanceAfter,2);
  for(let attempt=0;attempt<3;attempt++){
   const response=await fetch('http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=demo-key',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email,password:'test-password-123',returnSecureToken:true})});
   const login=await response.json();assert.ok(login.idToken);

@@ -151,3 +151,17 @@ npm test            # Auth+Firestore+Functions: 보안 규칙 및 원자적 지�
 ## 독립 GitHub 관리와 Firebase 준비
 
 현재 코드만 `zaen92/bl_new`의 `codex/step1-foundation` 브랜치에서 독립적으로 관리합니다. 다른 저장소/브랜치 코드는 가져오지 않습니다. GitHub 연결·권한 안내는 [docs/GITHUB.md](docs/GITHUB.md), Firebase 프로젝트/Web App/Auth/Firestore 생성과 환경별 설정은 [docs/FIREBASE_SETUP.md](docs/FIREBASE_SETUP.md)를 참고하세요. 공개 배포와 STEP 2 개발은 아직 진행하지 않습니다.
+
+## STEP 1 SDK 객체 및 Chromium 신뢰 진단
+
+서버 코드·직접 서버 통합 테스트·상품 seed는 `functions/src/admin.js`에서 Admin SDK를 가져옵니다. 루트와 functions에 동일 버전이 설치되어도 서로 다른 모듈 경로의 `FieldValue`/`Timestamp` 객체는 섞으면 안 됩니다. 통합 테스트의 Firestore 인스턴스를 루트 SDK에서 만들지 마세요. 서버 트랜잭션은 계속 네이티브 `FieldValue.serverTimestamp()`를 사용합니다.
+
+관리형 테스트 환경의 CA는 다음 **읽기 전용** 진단으로 시스템 체인과 사용자 Chromium NSS 저장소의 DER 지문/SSL 신뢰를 비교할 수 있습니다.
+
+```bash
+python scripts/check-browser-ca.py
+```
+
+이 스크립트는 인증서를 등록하거나 TLS 검증을 끄지 않습니다. 제공된 프록시 CA가 다른 이름으로 이미 등록되어 있을 수 있으므로 닉네임 대신 지문을 비교합니다. 등록이 없거나 시스템 체인 검증에 실패하면 환경 관리자에게 해당 환경의 검증된 CA 등록을 요청해야 합니다. 운영 시스템/일반 개발자 컴퓨터의 신뢰 저장소를 바꾸는 용도가 아닙니다.
+
+최신 검증 상태는 `docs/VALIDATION.md`의 맨 위 SDK/CA 수정 기록을 확인하세요. 로컬 직렬화 회귀 통과와 실제 Firestore 트랜잭션 통과를 구분합니다.

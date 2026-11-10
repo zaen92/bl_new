@@ -1,5 +1,4 @@
-import {initializeApp} from 'firebase-admin/app';
-import {getFirestore} from 'firebase-admin/firestore';
+import {initializeApp,getFirestore} from '../functions/src/admin.js';
 // Production requires explicit project, credentials and price review. No guessed prices.
 if(!process.env.FIRESTORE_EMULATOR_HOST)throw new Error('Emulator 전용 seed입니다. 실제 상품은 관리자가 검토 후 등록하세요.');
 initializeApp({projectId:'demo-jaeinit'});

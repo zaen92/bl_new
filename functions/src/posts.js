@@ -1,5 +1,5 @@
 import { HttpsError } from 'firebase-functions/v2/https';
-import { FieldValue } from 'firebase-admin/firestore';
+import { FieldValue } from './admin.js';
 const fail = message => { throw new HttpsError('invalid-argument', message); };
 const idPattern = /^[A-Za-z0-9_-]{1,100}$/;
 const resultFields = ['title_1','title_2','title_3','keyword_main','keyword_sub','keyword_location','keyword_intent','place_name','place_address','place_hours','place_price','body','reel','thumbnail'];

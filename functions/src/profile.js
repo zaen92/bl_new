@@ -1,5 +1,5 @@
 import { createHmac } from 'node:crypto';
-import { FieldValue } from 'firebase-admin/firestore';
+import { FieldValue } from './admin.js';
 
 export function signupIdentity(email, secret) {
   if (!secret || secret.length < 32) throw new Error('SIGNUP_IDENTITY_HMAC_KEY must have at least 32 characters');
