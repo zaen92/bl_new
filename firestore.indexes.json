@@ -1,0 +1,35 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "posts",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "uid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "updatedAt",
+          "order": "DESCENDING"
+        }
+      ]
+    }
+  ],
+  "fieldOverrides": [
+    {
+      "collectionGroup": "photoChunks",
+      "fieldPath": "value",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "posts",
+      "fieldPath": "data",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "posts",
+      "fieldPath": "form",
+      "indexes": []
+    }
+  ]
+}

@@ -1,0 +1,36 @@
+rules_version = '2';
+service cloud.firestore {
+ match /databases/{database}/documents {
+   function signedIn() { return request.auth != null; }
+   function admin() { return signedIn() && request.auth.token.admin == true; }
+   function owner() { return signedIn() && resource.data.uid == request.auth.uid; }
+   match /users/{uid} {
+     allow read: if signedIn() && (request.auth.uid == uid || admin());
+     // Credit/profile writes go through trusted Admin SDK services only.
+     allow write: if false;
+   }
+   match /creditLedger/{id} { allow read: if owner() || admin(); allow write: if false; }
+   match /orders/{id} { allow read: if owner() || admin(); allow write: if false; }
+   match /generations/{id} { allow read: if owner() || admin(); allow write: if false; }
+   match /posts/{id} {
+     allow read: if owner() || admin();
+     allow write: if false;
+     match /photoChunks/{chunkId} {
+       allow read: if signedIn() && (get(/databases/$(database)/documents/posts/$(id)).data.uid == request.auth.uid || admin());
+       allow write: if false;
+     }
+   }
+   match /creditPackages/{id} {
+     allow read: if signedIn();
+     // Prices are server configured and never accepted from a buyer.
+     allow write: if admin()
+       && request.resource.data.keys().hasOnly(['credits','priceKRW','active'])
+       && request.resource.data.credits in [10,30,70]
+       && request.resource.data.priceKRW is int && request.resource.data.priceKRW > 0
+       && request.resource.data.active is bool;
+   }
+   // Permanent HMAC identity claims must never be exposed to browsers, including admins.
+   match /signupClaims/{id} { allow read, write: if false; }
+   match /{document=**} { allow read, write: if false; }
+ }
+}

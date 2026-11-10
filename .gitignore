@@ -1,0 +1,10 @@
+node_modules/
+functions/node_modules/
+dist/
+.env*
+!.env.example
+functions/.secret.local
+*-debug.log
+playwright-report/
+test-results/
+.local/
