@@ -1,11 +1,12 @@
-import {test} from 'node:test';
+import {test,after} from 'node:test';
 import assert from 'node:assert/strict';
-import {initializeApp,getFirestore,getAuth,Timestamp} from '../functions/src/admin.js';
+import {initializeApp,deleteApp,getFirestore,getAuth,Timestamp} from '../functions/src/admin.js';
 import {provisionProfile,signupIdentity} from '../functions/src/profile.js';
 import {saveOwnedPost,loadOwnedPost} from '../functions/src/posts.js';
 if(!process.env.FIRESTORE_EMULATOR_HOST || !process.env.FIREBASE_AUTH_EMULATOR_HOST)throw new Error('Run npm test with emulators.');
 const app=initializeApp({projectId:'demo-jaeinit'});
 const db=getFirestore(app),auth=getAuth(app);
+after(async()=>{await db.terminate();await deleteApp(app);});
 const key='emulator-test-only-signup-hmac-key-000000000000';
 const identity=uid=>({uid,email:`${uid}@example.test`,emailVerified:true,displayName:'테스트'});
 const post={title:'서울 카페',type:'카페',volume:'normal',date:'오늘',data:{title_1:'서울 카페',body:'사진 포함 본문 [사진1]',hashtags:['#서울']},form:{ti:'제목',mi:'메모',ci:'직접 쓴 내용',ii:'주소'},imgs:['data:image/png;base64,'+'YQ=='.repeat(1)]};

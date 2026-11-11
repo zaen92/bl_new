@@ -171,3 +171,7 @@ python scripts/check-browser-ca.py
 설치 단계에서 공식 바이너리를 준비하고 테스트 단계에서는 재다운로드하지 않습니다. `npm run emulators:prepare`로 Firestore를 준비하고, 개발용 UI도 필요하면 `-- --ui`를 추가하세요. `npm run emulators:check` 및 모든 Emulator 시작 명령은 같은 캐시의 크기·MD5·SHA-256과 Java를 사전 검사합니다. 기존 정상 공식 파일은 검증 후 재사용할 수 있습니다.
 
 캐시 위치, 성공한 실행의 파일 재사용, Chromium NSS 읽기/쓰기 권한과 TLS 오류 구분은 [docs/EMULATOR_SETUP.md](docs/EMULATOR_SETUP.md)를 참고하세요. 현재 정상 JAR가 없으므로 실제 서버 검증 완료를 의미하지 않습니다.
+
+## 독립 CI 검증
+
+GitHub Actions의 **STEP 1 Emulator tests**가 작업 브랜치 push 및 수동 실행을 지원합니다. GitHub 호스팅 러너에서 공식 Emulator를 준비하고 기존 테스트를 실행하며, 운영 Firebase 비밀이나 배포는 사용하지 않습니다. 실행 방법·기대 테스트 수·로그 보호는 [docs/CI.md](docs/CI.md), 실제 확인된 결과는 [docs/VALIDATION.md](docs/VALIDATION.md)를 참고하세요.

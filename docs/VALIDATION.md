@@ -1,3 +1,31 @@
+# GitHub Actions 독립 CI 구축 — 2026-11-11 (KST)
+
+`.github/workflows/step1-tests.yml`을 추가했습니다. GitHub 호스팅 Ubuntu 24.04 / Node 22.23.4 / Temurin Java 21.0.13+9에서 두 lockfile 설치, 공식 Firestore 준비·검증, 실제 Auth/Firestore/Functions 실행, 빌드/단위/UI/Auth 검증을 구성했습니다. push 대상은 `codex/step1-foundation`이며 workflow_dispatch도 지원합니다. 현재 코덱스 환경에서 Firebase/브라우저 다운로드는 재시도하지 않았습니다.
+
+## 실행 증거 상태
+
+이 문서 작성 시점에는 **GitHub 실제 실행 결과를 아직 확인하지 않았습니다**. Workflow 구성/로컬 검사와 GitHub CI 완료는 구분합니다. 실제 실행 URL과 결과가 확인되면 별도 기록합니다. 이 단락은 STEP 1 완료 판정의 증거가 아닙니다.
+
+GitHub API의 기존 인증으로 읽기 요청을 시도했으나 `api.github.com` 연결이 `Forbidden`이었습니다. GitHub Actions 웹 페이지는 HTTP 200이어서 push 후 공개 페이지에서 실행 여부를 확인할 예정입니다. 인증값은 출력하지 않았고 새 비밀이나 서비스 계정은 요청하지 않았습니다.
+
+로컬에서 수행한 추가 검사: CI 로그 제거/집계/실패 코드 보존 회귀 **3개 통과**, 기존 단위 **7개 통과**. 실제 Emulator 서버 11개를 이 결과로 대신하지 않습니다.
+
+## 구성 및 보호
+
+- Actions는 공식 저장소 태그를 읽어 확인한 commit SHA로 고정하고 런타임은 기존 `.nvmrc`와 정확한 Java 21 버전을 지정했습니다. 프로젝트 의존성은 두 lockfile의 `npm ci`로 고정합니다.
+- CI 캐시에는 공식 검증을 통과한 JAR만 저장합니다. 실제 운영 Firebase/서비스 계정/결제/API 비밀은 사용하지 않습니다.
+- 가입 HMAC 키는 job마다 임의 생성한 Emulator 전용 로컬 파일입니다. 로그에 출력하거나 artifact/cache에 포함하지 않고 마지막에 삭제합니다. 값 대신 타임스탬프 문자열을 쓰거나 보안 규칙을 완화하지 않습니다.
+- `scripts/ci-run.mjs`, `ci-utils.mjs`, `ci-summary.mjs`가 로그의 테스트 비밀·Bearer/JWT·이메일 인증 코드 등을 출력 전에 제거하고 원래 exit status와 실제 테스트 수를 기록합니다. 실행하지 않은 단계는 not run입니다. 0개·skip·누락을 통과로 표시하지 않습니다.
+- Artifact는 가공된 로그/숫자 JSON만 포함합니다. 원시 debug log·브라우저 trace·비밀 파일·Emulator 데이터는 업로드하지 않습니다.
+- Google 외부 SDK 실패는 Auth 단계의 실패로 유지하고 실제 Google OAuth와 구분합니다. 다른 단계가 실행되도록 조건을 분리했으며 `continue-on-error`는 없습니다.
+- 서버 테스트가 종료할 때 실제 Admin Firestore 연결과 app을 정리하도록 after hook을 추가했습니다. 검증 assertion/비즈니스 로직은 유지했습니다. UI/CSS/앱 기능 변경은 없습니다.
+
+필수 고유 case: 단위 7 + UI 4 + Auth 2 + 보안 4 + 서버 7 = **24개**, CI 도구 3개는 별도입니다. `npm test`의 18개에는 동일 단위 7개가 다시 포함되므로 중복 집계하지 않습니다. 로컬 결과와 GitHub 결과도 합산하지 않습니다. 수동 실행·권한 안내는 `docs/CI.md`를 참고하세요.
+
+---
+
+# 이전 작업 기록 (해당 시점 결과)
+
 # Emulator 실행 환경·캐시 안정화 — 2026-11-11 (KST)
 
 기준 커밋 `6defd55`, 작업 브랜치 `codex/step1-foundation`. UI/CSS·앱 기능·서버 비즈니스 로직·Firestore 규칙은 변경하지 않았습니다. 다른 저장소 통합·실제 Firebase 배포·STEP 2 개발은 없습니다.
