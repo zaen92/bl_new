@@ -4,7 +4,7 @@
 
 ## 실행 증거 상태
 
-이 문서 작성 시점에는 **GitHub 실제 실행 결과를 아직 확인하지 않았습니다**. Workflow 구성/로컬 검사와 GitHub CI 완료는 구분합니다. 실제 실행 URL과 결과가 확인되면 별도 기록합니다. 이 단락은 STEP 1 완료 판정의 증거가 아닙니다.
+최초 workflow push 커밋 `12f23e6`의 실제 실행을 GitHub Actions 공개 페이지에서 확인했습니다: https://github.com/zaen92/bl_new/actions/runs/43010651756 (확인 시점 in progress). 완료 결과는 아직 확인하지 않았으며 STEP 1 완료 증거로 사용하지 않습니다. 로컬에서 Node 22/24 리포터 차이를 확인해 TAP 고정과 spec/TAP 집계 호환을 보강했고 CI 도구 3개/단위 7개가 수집기를 거쳐 통과했습니다. 최신 보강 push의 실행 결과는 계속 별도로 확인합니다.
 
 GitHub API의 기존 인증으로 읽기 요청을 시도했으나 `api.github.com` 연결이 `Forbidden`이었습니다. GitHub Actions 웹 페이지는 HTTP 200이어서 push 후 공개 페이지에서 실행 여부를 확인할 예정입니다. 인증값은 출력하지 않았고 새 비밀이나 서비스 계정은 요청하지 않았습니다.
 
@@ -17,7 +17,7 @@ GitHub API의 기존 인증으로 읽기 요청을 시도했으나 `api.github.c
 - 가입 HMAC 키는 job마다 임의 생성한 Emulator 전용 로컬 파일입니다. 로그에 출력하거나 artifact/cache에 포함하지 않고 마지막에 삭제합니다. 값 대신 타임스탬프 문자열을 쓰거나 보안 규칙을 완화하지 않습니다.
 - `scripts/ci-run.mjs`, `ci-utils.mjs`, `ci-summary.mjs`가 로그의 테스트 비밀·Bearer/JWT·이메일 인증 코드 등을 출력 전에 제거하고 원래 exit status와 실제 테스트 수를 기록합니다. 실행하지 않은 단계는 not run입니다. 0개·skip·누락을 통과로 표시하지 않습니다.
 - Artifact는 가공된 로그/숫자 JSON만 포함합니다. 원시 debug log·브라우저 trace·비밀 파일·Emulator 데이터는 업로드하지 않습니다.
-- Google 외부 SDK 실패는 Auth 단계의 실패로 유지하고 실제 Google OAuth와 구분합니다. 다른 단계가 실행되도록 조건을 분리했으며 `continue-on-error`는 없습니다.
+- Google 외부 SDK 실패는 Auth 단계의 실패로 유지하고 실제 Google OAuth와 구분합니다. 다른 단계가 실행되도록 조건을 분리했으며 `continue-on-error`는 없습니다. 테스트 스크립트의 TAP 출력 고정은 case나 assertion을 바꾸지 않습니다.
 - 서버 테스트가 종료할 때 실제 Admin Firestore 연결과 app을 정리하도록 after hook을 추가했습니다. 검증 assertion/비즈니스 로직은 유지했습니다. UI/CSS/앱 기능 변경은 없습니다.
 
 필수 고유 case: 단위 7 + UI 4 + Auth 2 + 보안 4 + 서버 7 = **24개**, CI 도구 3개는 별도입니다. `npm test`의 18개에는 동일 단위 7개가 다시 포함되므로 중복 집계하지 않습니다. 로컬 결과와 GitHub 결과도 합산하지 않습니다. 수동 실행·권한 안내는 `docs/CI.md`를 참고하세요.

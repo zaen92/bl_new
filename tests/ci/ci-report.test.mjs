@@ -14,6 +14,7 @@ test('CI logs redact known secret values, bearer tokens and Emulator verificatio
 test('CI counts preserve failures/skips and reject missing test evidence',()=>{
  assert.deepEqual(parseCounts('# tests 18\n# pass 17\n# fail 1\n# skipped 0\n'),{total:18,passed:17,failed:1,skipped:0});
  assert.deepEqual(parseCounts('  1 failed\n  1 passed (2s)\n'),{total:2,passed:1,failed:1,skipped:0});
+ assert.deepEqual(parseCounts('\u001b[32mℹ tests 3\u001b[0m\nℹ pass 3\nℹ fail 0\nℹ skipped 0\n'),{total:3,passed:3,failed:0,skipped:0});
  assert.equal(parseCounts('No test suite started'),null);
 });
 test('CI command runner preserves failing exit status and uploads only sanitized output',async()=>{

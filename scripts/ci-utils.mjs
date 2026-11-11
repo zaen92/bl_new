@@ -9,6 +9,7 @@ export function sanitizeLog(text,secrets=[]){
   .replace(/\b(?:gh[pousr]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,}|sk-ant-[A-Za-z0-9_-]{20,})/g,'[REDACTED_TOKEN]');
 }
 export function parseCounts(log){
+ log=log.replace(/\x1b\[[0-?]*[ -/]*[@-~]/g,'').replace(/^\s*ℹ /gm,'# ');
  const last=re=>[...log.matchAll(re)].at(-1)?.[1];
  const total=last(/^\s*# tests (\d+)\s*$/gm);
  if(total!==undefined)return {total:Number(total),passed:Number(last(/^\s*# pass (\d+)\s*$/gm)||0),failed:Number(last(/^\s*# fail (\d+)\s*$/gm)||0),skipped:Number(last(/^\s*# skipped (\d+)\s*$/gm)||0)};

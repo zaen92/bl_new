@@ -69,7 +69,7 @@ jobs:
       - name: Check CI log redaction and result accounting
         id: ci-tools
         if: ${{ !cancelled() && steps.deps.outcome == 'success' }}
-        run: node scripts/ci-run.mjs ci-tools node --test tests/ci/ci-report.test.mjs
+        run: node scripts/ci-run.mjs ci-tools node --test --test-reporter=tap tests/ci/ci-report.test.mjs
 
       - name: Restore official Firestore artifact cache
         id: emulator-cache
