@@ -175,3 +175,5 @@ python scripts/check-browser-ca.py
 ## 독립 CI 검증
 
 GitHub Actions의 **STEP 1 Emulator tests**가 작업 브랜치 push 및 수동 실행을 지원합니다. GitHub 호스팅 러너에서 공식 Emulator를 준비하고 기존 테스트를 실행하며, 운영 Firebase 비밀이나 배포는 사용하지 않습니다. 실행 방법·기대 테스트 수·로그 보호는 [docs/CI.md](docs/CI.md), 실제 확인된 결과는 [docs/VALIDATION.md](docs/VALIDATION.md)를 참고하세요.
+
+STEP 1 Emulator 필수 고유 테스트 24개가 [GitHub Actions Run #2](https://github.com/zaen92/bl_new/actions/runs/43010870395)에서 모두 통과했습니다. CI 도구 3개도 별도 통과했습니다. 과거 로컬 네트워크 차단 기록은 해당 시점의 결과이며 최신 완료 근거는 `docs/VALIDATION.md` 맨 위를 참고하세요. 실제 Google OAuth/운영 연결·STEP 2·배포는 별도입니다.

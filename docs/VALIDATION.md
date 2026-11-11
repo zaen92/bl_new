@@ -1,3 +1,51 @@
+# GitHub Actions 실제 검증 완료 — 2026-11-11 (KST)
+
+**STEP 1의 Emulator 기반 필수 검증을 완료했습니다.** 코드/테스트 보강 커밋 `95b192637e2b91638f29e1207f4458cb04a0b736`의 GitHub 호스팅 Ubuntu 실행이 **success**로 완료됐습니다. 실제 Firebase 운영 연결·실제 Google OAuth·STEP 2·결제·공개 배포는 수행하지 않았습니다.
+
+- 실행 URL: https://github.com/zaen92/bl_new/actions/runs/43010870395
+- Job URL: https://github.com/zaen92/bl_new/actions/runs/43010870395/job/130489955579
+- 브랜치: `codex/step1-foundation`, 이벤트: push, Run #2.
+- 주요 테스트 단계: 2026-11-11 20:19:14 ~ 20:20:22 KST. 최종 Actions 결론: `WORKFLOW_RUN_CONCLUSION_SUCCESS`.
+- 최초 Run #1 (`12f23e6`)은 최신 보강 push에 의해 concurrency 정책으로 취소됐습니다. 취소 실행을 통과/실패 case로 집계하지 않습니다.
+
+## 확인된 결과
+
+| 필수 검증 | 통과 | 실패 | 미실행 | 실제 확인 근거 |
+|---|---:|---:|---:|---|
+| 빌드 | 빌드 통과 | 0 | 0 | Build 단계 success |
+| 기존 단위 | **7** | 0 | 0 | Seven unit tests success, 7개/skip 0 검사 |
+| UI 회귀 | **4** | 0 | 0 | Four UI regression tests success, 4개/skip 0 검사 |
+| 이메일 Auth Emulator | **1** | 0 | 0 | Auth 단계 success, 합계 2개/skip 0 검사 |
+| Google Auth Emulator | **1** | 0 | 0 | 같은 Auth 단계에서 실제 팝업 case 통과 |
+| Firestore 보안 | **4** | 0 | 0 | 실제 integration 단계 success |
+| 서버 통합 | **7** | 0 | 0 | 실제 integration 단계 success |
+| 별도 CI 도구 회귀 | **3** | 0 | 0 | 로그 제거·집계·실패 코드 보존 단계 success |
+
+필수 앱 테스트 **24 통과 / 0 실패 / 0 미실행**, 별도 CI 도구 **3 통과**입니다. integration 명령은 **18개(보안 4+서버 7+기존 단위 7)**를 실행했고 성공 조건으로 18개 모두 pass/skip 0을 요구했습니다. 별도 unit의 7개와 중복 집계하지 않았습니다. 빌드/환경 준비는 case 수에 넣지 않습니다.
+
+### SDK·크레딧·보안 검증
+
+- 공통 `functions/src/admin.js`를 사용한 실제 서버 트랜잭션과 네이티브 `FieldValue.serverTimestamp()`/`Timestamp` 저장·불러오기가 통과했습니다. 혼합 SDK의 ServerTimestampTransform 오류는 해당 회귀/서버 case에서 재발하지 않았습니다.
+- 같은 회원 초기화 **24건**, 같은 이메일을 가진 다른 UID **24건**, 실제 Callable 회원 초기화 **24건** 동시 요청 검증이 통과했습니다. 최초 무료 잔액 2, 원장 1개/+2, 동일 commit Timestamp assertion을 유지했습니다.
+- 실제 재로그인 3회 후 잔액/원장 유지, 프로필 재생성/동일 이메일 재가입의 무료 크레딧 재지급 방지, 미인증·비활성 계정 거부가 통과했습니다.
+- 본인 글/사진/원문 저장·조회, 다른 회원 글 접근 거부, 버전 충돌/CAS, 요청 멱등성, 잘못된/대형 이미지 부분 저장 방지가 통과했습니다.
+- 익명 접근, 다른 회원의 잔액·원장·주문·글 조회/변경·삭제, 관리자 브라우저의 금융 데이터 쓰기 거부, 상품 관리자 claim/가격 검증이 통과했습니다. 규칙을 완화하지 않았습니다.
+- Google **Emulator** 계정 선택 팝업 테스트가 GitHub 호스팅 브라우저에서 통과했습니다. 실제 Google 계정 OAuth나 운영 Firebase 설정을 검증한 것은 아닙니다.
+
+## 환경과 증거 접근의 한계
+
+공식 Firestore 준비/검증 단계 success, 실제 Auth/Firestore/Functions integration success, pinned Playwright Chromium 설치 success를 확인했습니다. 재사용 캐시도 검증 통과했으며, 이번 실행의 cache save는 cache-hit에 따라 정상적으로 skipped였습니다. 이것은 테스트 skip이 아닙니다.
+
+GitHub API는 이 코덱스 환경에서 Forbidden이었고 비로그인 상세 로그 endpoint도 404여서 원시 CI 로그/artifact를 직접 내려받아 읽지는 못했습니다. 대신 GitHub Actions 공개 페이지의 run 상태와 job의 **각 check-step success**를 확인했습니다. 테스트 수는 해당 커밋의 CI 수집기가 검증하는 기대 수와 실제 단계 성공을 함께 근거로 기록했습니다. 확인하지 못한 원시 로그를 읽었다고 주장하지 않습니다. 로그인한 저장소 사용자는 Actions 단계 로그·Job Summary·`step1-test-evidence-1` artifact에서 세부 결과를 확인할 수 있습니다. Summary/가공된 로그·숫자 JSON upload와 임시 key cleanup 단계도 success였습니다.
+
+CI에는 실제 운영 Secret/서비스 계정이 제공되지 않았고 Emulator 전용 HMAC 파일만 임시 생성했습니다. 가공된 로그/숫자 JSON만 업로드하도록 경로를 제한했으며 TLS 검증 해제, assertion 생략, fake Emulator, 보안 규칙 완화는 없습니다. 코덱스의 Firebase 다운로드 재시도 없이 독립 실행 환경으로 검증했습니다.
+
+구성 파일/수동 실행/고정 버전과 실패 분류는 `docs/CI.md`를 참고하세요. 이 결과는 STEP 1 Emulator 범위를 완료하며, 이후 실제 Firebase 테스트 프로젝트에서 Google OAuth/운영 IAM/메일 등을 확인하는 작업은 별도입니다. STEP 2 착수나 실제 배포를 이 기록으로 자동 승인하지 않습니다.
+
+---
+
+# CI 구축 과정 및 이전 작업 기록
+
 # GitHub Actions 독립 CI 구축 — 2026-11-11 (KST)
 
 `.github/workflows/step1-tests.yml`을 추가했습니다. GitHub 호스팅 Ubuntu 24.04 / Node 22.23.4 / Temurin Java 21.0.13+9에서 두 lockfile 설치, 공식 Firestore 준비·검증, 실제 Auth/Firestore/Functions 실행, 빌드/단위/UI/Auth 검증을 구성했습니다. push 대상은 `codex/step1-foundation`이며 workflow_dispatch도 지원합니다. 현재 코덱스 환경에서 Firebase/브라우저 다운로드는 재시도하지 않았습니다.
