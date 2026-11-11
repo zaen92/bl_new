@@ -5,6 +5,7 @@ Never disables TLS verification or imports arbitrary certificates. Trust changes
 if required, must be reviewed separately for the provided environment CA.
 """
 import hashlib
+import os
 from pathlib import Path
 import re
 import shutil
@@ -36,3 +37,10 @@ for line in listing.splitlines():
         break
 else:
     sys.exit('Provided CA is not trusted for SSL in this user NSS DB; ask the environment administrator to enroll this verified CA. No settings changed.')
+
+# Chromium initializes NSS/SQLite read-write, even when merely reading CA trust.
+# Directory writes are needed for SQLite lock/journal files, not new CA trust.
+paths=[db,db/'cert9.db',db/'key4.db']
+if not all(os.access(path,os.W_OK) for path in paths):
+    sys.exit('CA is trusted, but Chromium cannot initialize the NSS DB read-write. Grant the test process write access only to '+str(db)+'; do not disable TLS or re-enroll the same CA.')
+print('Chromium NSS SQLite read/write access: ready.')

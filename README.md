@@ -165,3 +165,9 @@ python scripts/check-browser-ca.py
 이 스크립트는 인증서를 등록하거나 TLS 검증을 끄지 않습니다. 제공된 프록시 CA가 다른 이름으로 이미 등록되어 있을 수 있으므로 닉네임 대신 지문을 비교합니다. 등록이 없거나 시스템 체인 검증에 실패하면 환경 관리자에게 해당 환경의 검증된 CA 등록을 요청해야 합니다. 운영 시스템/일반 개발자 컴퓨터의 신뢰 저장소를 바꾸는 용도가 아닙니다.
 
 최신 검증 상태는 `docs/VALIDATION.md`의 맨 위 SDK/CA 수정 기록을 확인하세요. 로컬 직렬화 회귀 통과와 실제 Firestore 트랜잭션 통과를 구분합니다.
+
+## Emulator 사전 준비와 캐시 재사용
+
+설치 단계에서 공식 바이너리를 준비하고 테스트 단계에서는 재다운로드하지 않습니다. `npm run emulators:prepare`로 Firestore를 준비하고, 개발용 UI도 필요하면 `-- --ui`를 추가하세요. `npm run emulators:check` 및 모든 Emulator 시작 명령은 같은 캐시의 크기·MD5·SHA-256과 Java를 사전 검사합니다. 기존 정상 공식 파일은 검증 후 재사용할 수 있습니다.
+
+캐시 위치, 성공한 실행의 파일 재사용, Chromium NSS 읽기/쓰기 권한과 TLS 오류 구분은 [docs/EMULATOR_SETUP.md](docs/EMULATOR_SETUP.md)를 참고하세요. 현재 정상 JAR가 없으므로 실제 서버 검증 완료를 의미하지 않습니다.

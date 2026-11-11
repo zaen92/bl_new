@@ -10,3 +10,6 @@ if [ ! -f functions/.secret.local ]; then
   node --input-type=module -e 'import {writeFileSync} from "node:fs"; import {randomBytes} from "node:crypto"; writeFileSync("functions/.secret.local", "SIGNUP_IDENTITY_HMAC_KEY="+randomBytes(32).toString("hex")+"\n", {mode:0o600,flag:"wx"});'
 fi
 npm run build
+
+# Prepare verified official artifacts once; later tests never auto-download.
+npm run emulators:prepare -- --ui

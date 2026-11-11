@@ -1,3 +1,59 @@
+# Emulator 실행 환경·캐시 안정화 — 2026-11-11 (KST)
+
+기준 커밋 `6defd55`, 작업 브랜치 `codex/step1-foundation`. UI/CSS·앱 기능·서버 비즈니스 로직·Firestore 규칙은 변경하지 않았습니다. 다른 저장소 통합·실제 Firebase 배포·STEP 2 개발은 없습니다.
+
+## 캐시 조사와 변경
+
+- 프로젝트 지정 캐시 `/workspace/.cache/firebase`는 비어 있었고 공식 기본 캐시 `/home/agent/.cache/firebase/emulators`도 없었습니다. 접근 가능한 `/workspace`, `/tmp`, `/opt`의 파일 검색에서도 정상 Firestore JAR를 확보하지 못했습니다. 일부 다른 프로세스의 `/tmp` 디렉터리는 접근 거부이므로 전체 머신 어디에도 파일이 없다고 단정하지 않습니다.
+- 공식 CLI 14.27.0은 JAR가 있으면 재사용하지만 시작 때 기존 파일의 해시를 다시 검사하지는 않습니다. 반면 `setup:emulators:firestore`는 기존 파일 유무와 무관하게 다운로드합니다. 테스트가 캐시를 지우는 코드는 없었습니다. 성공했던 다른 실행의 캐시 경로/볼륨이 달랐는지는 이 정보만으로 확정할 수 없습니다.
+- `scripts/emulator-cache.mjs`, `scripts/prepare-emulators.mjs`를 추가했습니다. 설치된 CLI의 공식 메타데이터에서 버전·공식 HTTPS URL·크기·MD5·SHA-256을 읽습니다. 정상 대상은 재다운로드하지 않습니다. CLI 기본 캐시 또는 명시한 재사용 디렉터리의 파일도 동일 기준을 만족해야 하며 복사 후 다시 검증합니다.
+- 누락 때만 고정된 공식 CLI로 다운로드하고 무결성을 재검사합니다. 검증 실패한 파일을 실행하지 않으며 준비 모드에서는 별도 `.invalid-artifacts` 디렉터리에 보존합니다. 임의 미러/체크섬 수정/검증 없는 binary override를 사용하지 않습니다.
+- `scripts/local-setup.sh` 끝에 Firestore/선택적 개발 UI 사전 준비를 추가했습니다. `scripts/firebase-local.sh`는 서비스/테스트 시작 전 캐시를 읽기 전용 검사하고, 누락·손상 시 다운로드 없이 실패합니다. Auth-only 실행은 JAR가 필요 없으므로 독립 실행됩니다.
+- `npm run emulators:prepare -- --ui` 실제 실행: Java 21 정상, 두 캐시의 JAR 누락 확인 후 공식 GCS 다운로드 **403 Domain forbidden**. UI는 Firestore 준비 실패로 아직 시도하지 않았습니다. 정상 공식 파일이 없으므로 실제 정상 JAR 재사용 경로의 성공은 검증하지 못했습니다.
+- 캐시 검증 단위 테스트 3개를 추가했습니다. 누락·잘림·동일 크기 변조 거부, 사전 검사에서 다운로드/삭제/실행 없음, 대상별 JAR/UI 필요 여부를 검사합니다. 작은 바이트 fixture는 검증기 테스트에서만 사용하며 Emulator로 실행하지 않았습니다.
+
+공식 Firestore 파일: `cloud-firestore-emulator-v1.19.8.jar`, 63,634,791 bytes, SHA-256 `9d43599ed6151199e8d604dc87fac51218e49e5f3a48519b1ae560bbe5e3382d`. 자세한 경로·재사용·시작 절차는 `docs/EMULATOR_SETUP.md`에 기록했습니다.
+
+## 실제 Chromium NSS 접근 문제 확인·해결
+
+제공된 프록시 CA는 이전과 같은 DER 지문이며 `OpenAI-nebula-dns` / `C,,`로 이미 신뢰되어 있었습니다. 읽기 전용 `certutil` 검사만으로 Chromium 사용 가능을 판단해서는 안 됨을 확인했습니다.
+
+동일 Playwright launch options의 Chromium 156으로 `https://registry.npmjs.org/firebase/latest`를 열면 일반 샌드박스에서는 **ERR_CERT_AUTHORITY_INVALID**였습니다. 승인된 파일 접근 진단에서 Chromium이 `/home/agent/.pki/nssdb/cert9.db`, `key4.db`를 **O_RDWR**로 여는 것이 확인되었고 같은 HTTPS 주소가 **200**이었습니다. 실제 SQLite DB 초기화에 쓰기 접근이 필요했던 것입니다.
+
+`/home/agent/.pki/nssdb` **한 디렉터리에만 현재 턴 쓰기 권한**을 요청해 승인받았습니다. 그 뒤 일반 테스트 실행기에서도 같은 공식 HTTPS 주소가 TLS 검증을 유지한 채 **200**이었습니다. CA 등록 내용, 시스템/운영 신뢰 저장소, 브라우저 TLS 검증 플래그는 변경하지 않았습니다. 프로필/홈 경로도 바꾸지 않았습니다. 권한은 현재 턴 범위로, 다음 작업에 자동 유지된다고 가정하지 않습니다.
+
+`scripts/check-browser-ca.py`는 이제 신뢰 지문·체인뿐 아니라 NSS 디렉터리와 SQLite 파일의 쓰기 접근도 검사합니다. 관리형 환경의 `scripts/test-auth.sh`는 이 검사를 통과해야 Chromium을 시작합니다. 검사 자체는 신뢰 저장소를 변경하지 않습니다.
+
+NSS 접근 조건을 해결한 뒤의 Google SDK 오류는 **ERR_TUNNEL_CONNECTION_FAILED**입니다. 현재 프록시가 Google SDK 터널을 막은 것이며 인증서 오류와 다르게 분류합니다. Auth Emulator 팝업은 실제 Google OAuth가 아니며 실제 OAuth는 계속 미실행입니다. `ignoreHTTPSErrors`, 인증서 검증 비활성화, 임의 CA 교체는 하지 않았습니다.
+
+## 전체 명령 실행 결과
+
+| 명령 / 범위 | 통과 | 실패 | 미실행 | 근거 |
+|---|---:|---:|---:|---|
+| `npm run build` | 빌드 통과 | 0 | 0 | 기존 JS/CSS 결과 해시 유지. 번들 크기 경고만 있음 |
+| `npm run test:unit` | **7** | 0 | 0 | 기존 4개 + 캐시/사전 검사 3개 |
+| `npm run test:ui` | **4** | 0 | 0 | 기존 화면·글/사진/초안/JSON 저장 회귀 |
+| `npm run test:auth` | 이메일 **1** | Google **1** | 0 | NSS 검사 통과 후 새 Chromium 실행. SDK 터널 차단 |
+| `npm test` | 0 | 0 | **11** | 캐시 누락 사전 검사 exit 1. 보안 4+서버 7개 본문 미실행. **다운로드 시도 없음** |
+| 공식 Emulator 사전 준비 | 0 | 준비 실패 | 0 | 검증 가능한 캐시가 없어 공식 CLI 다운로드 시도, GCS 403 |
+| CA/NSS 읽기·쓰기 진단 및 실제 HTTPS probe | 진단 통과 | 0 | 0 | 기존 신뢰 유지, 현재 턴 제한 권한으로 실제 TLS 200 |
+
+자동 테스트의 고유 항목 합계는 **12 통과 / 1 실패 / 11 미실행**입니다. 전체 `npm test`에는 이미 별도 명령으로 통과한 단위 7개도 포함되지만 중복 집계하지 않습니다. 준비/빌드/진단 명령은 자동 테스트 수와 별도입니다.
+
+**공통 admin.js의 실제 Emulator 검증, 무료 2개·24건 동시 요청 중복 지급 방지·같은 이메일 재가입·글/사진 저장 트랜잭션·타인 접근 차단·서버 원자성은 이번에도 실행되지 않았습니다.** 단위 SDK 직렬화 회귀 통과를 실제 서버 성공으로 대체하지 않았습니다. 따라서 **STEP 1 필수 검증 완료가 아닙니다.**
+
+## 남은 실행 조건과 기록
+
+현재 필요한 것은 고정된 공식 파일을 정상 다운로드한 뒤 같은 캐시 경로를 유지하거나, 성공한 실행의 동일 버전 공식 파일을 해시 검증하여 재사용하는 것입니다. 이번 준비에서 공식 GCS 403이 재발했고 Google SDK도 프록시 터널 오류였습니다. 네트워크 설정 초안을 반복 변경하거나 우회를 시도하지 않았습니다. 외부 제약이 없는 정상 파일을 확보해야 실제 서버 테스트가 시작될 수 있습니다.
+
+원시 로그/추적은 Git 제외 `.local/cache-{prepare,check,build,unit-final,ui,auth-final,full-final}.log`, `.local/cache-browser-{nss,file-access}.trace`, `.local/cache-browser-https*.log`에 보관합니다. 사용자 인증 링크/프로세스 경로가 있는 원시 로그는 커밋하지 않습니다.
+
+변경 파일: `package.json`, `scripts/emulator-cache.mjs`, `scripts/prepare-emulators.mjs`, `scripts/firebase-local.sh`, `scripts/local-setup.sh`, `scripts/test-auth.sh`, `scripts/check-browser-ca.py`, `tests/emulator-cache.test.js`, `README.md`, `docs/EMULATOR_SETUP.md`, `docs/VALIDATION.md`. 의존성/lockfile 버전 변경은 없습니다.
+
+---
+
+# 이전 작업 기록 (해당 시점 결과)
+
 # SDK 객체 충돌 수정 및 CA 재검증 — 2026-11-10 (KST)
 
 요청 범위: STEP 1만 수정. 기존 `codex/step1-foundation` 브랜치를 사용하고 다른 프로젝트 코드/병합, UI/CSS 변경, 실제 Firebase 배포, STEP 2·결제 개발은 하지 않았습니다.
