@@ -65,7 +65,7 @@ Server API는 Auth의 현재 verified/disabled 상태를 확인합니다. `ENFOR
 
 ## Mock 및 CI
 
-Mock은 `FUNCTIONS_EMULATOR=true`인 경우에만 `AI_PROVIDER_MODE=mock`으로 허용합니다. 기본 disabled이며 실제 환경에서 mock으로 성공을 가장하지 않습니다. CI는 가짜 키 placeholder와 Emulator만 사용합니다. 비대화형 CLI가 false 기본값 입력을 기다리지 않도록 `functions/.env.local`에 `ENFORCE_APP_CHECK=false`를 명시합니다. 운영 설정을 바꾸는 작업이 아닙니다. `AI_MOCK_DELAY_MS`는 Emulator E2E 지연 재현용이며 실제 provider에 영향을 주지 않습니다.
+Mock은 `FUNCTIONS_EMULATOR=true`인 경우에만 `AI_PROVIDER_MODE=mock`으로 허용합니다. 기본 disabled이며 실제 환경에서 mock으로 성공을 가장하지 않습니다. CI는 가짜 키 placeholder와 Emulator만 사용합니다. CallableOptions에는 불리언 parameter 객체 대신 검증된 환경변수의 실제 boolean을 전달합니다. Emulator 설정을 명확히 하도록 `functions/.env.local`에 `ENFORCE_APP_CHECK=false`를 명시합니다. 운영 설정을 바꾸는 작업이 아닙니다. `AI_MOCK_DELAY_MS`는 Emulator E2E 지연 재현용이며 실제 provider에 영향을 주지 않습니다.
 
 STEP 1 workflow/브랜치는 보존합니다. Step 2에서는 `step2-tests.yml`을 사용해 Storage를 포함한 실제 Emulator와 mock provider를 검증합니다. 테스트 수와 실제 실행 결과는 `VALIDATION.md`에 별도로 기록합니다. 실제 Google OAuth/Anthropic 유료 호출/생산 IAM은 통과로 집계하지 않습니다.
 

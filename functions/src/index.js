@@ -1,5 +1,5 @@
 import { initializeApp, getAuth, getFirestore } from './admin.js';
-import { defineSecret,defineString,defineBoolean } from 'firebase-functions/params';
+import { defineSecret,defineString } from 'firebase-functions/params';
 import {onDocumentCreated} from 'firebase-functions/v2/firestore';
 import {onSchedule} from 'firebase-functions/v2/scheduler';
 import * as functionsV1 from 'firebase-functions/v1';
@@ -10,10 +10,11 @@ import {reserveGeneration,runGeneration,recoverExpired,saveBlogStyle,validateInp
 import {uploadPhotos,loadPhotos,photoBucket,cleanupPhotos,deleteUserPhotos} from './photos.js';
 import {anthropicProvider,mockProvider} from './ai-provider.js';
 import {validateAIConfig} from './ai-config.js';
+import {appCheckEnabled} from './runtime-config.js';
 initializeApp();
 const db = getFirestore();
 const identityKey = defineSecret('SIGNUP_IDENTITY_HMAC_KEY');
-const appCheck=defineBoolean('ENFORCE_APP_CHECK',{default:false});
+const appCheck=appCheckEnabled();
 const providerMode=defineString('AI_PROVIDER_MODE',{default:'disabled'});
 const claudeKey=defineSecret('CLAUDE_API_KEY'),naverId=defineSecret('NAVER_CLIENT_ID'),naverSecret=defineSecret('NAVER_CLIENT_SECRET');
 const options = { region: 'asia-northeast3', maxInstances: 10,enforceAppCheck:appCheck };

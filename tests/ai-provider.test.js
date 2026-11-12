@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {parseResult,readSSE,anthropicProvider,naverLookup,mockProvider,ProviderError} from '../functions/src/ai-provider.js';
 import {DEFAULT_AI_CONFIG,validateAIConfig,validateStyle,buckets} from '../functions/src/ai-config.js';
+import {appCheckEnabled} from '../functions/src/runtime-config.js';
 import {buildPrompt} from '../functions/src/prompt.js';
 const input={title:'서울 카페',memo:'메모',content:'직접 경험',placeInfo:'서울',type:'카페',volume:'normal'};
 const fixture=()=>Object.assign(Object.fromEntries(['title_1','title_2','title_3','keyword_main','keyword_sub','keyword_location','keyword_intent','place_name','place_address','place_hours','place_price','body','reel','thumbnail'].map(k=>[k,'테스트 '+k])),{hashtags:['#카페']});
@@ -66,6 +67,7 @@ test('limits/pricing validation and additive legacy bucket migration preserve to
  assert.throws(()=>buckets({credits:2,freeCredits:2,paidCredits:2}));
  for(const change of [{maxSearches:11},{timeoutMs:999999},{maxPhotos:11},{maxBillableInputTokens:1},{inputMicrosPerToken:0}])assert.throws(()=>validateAIConfig(change));
  assert.equal(validateAIConfig({enabled:false}).enabled,false);
+ assert.equal(appCheckEnabled('false'),false);assert.equal(appCheckEnabled('true'),true);assert.throws(()=>appCheckEnabled('typo'));
 });
 test('browser modules have no provider secret names or direct Claude/Naver API URLs',async()=>{
  for(const name of ['src/api.js','src/firebase.js','src/studio.js','src/generation-ui.js','src/blog-style.js','index.html']){
