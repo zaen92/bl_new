@@ -2,6 +2,8 @@
 
 현재 브랜치는 `codex/step2-ai-generation`이며 기준 STEP 1 `d83f78c`와 브랜치를 보존합니다. 서버 AI 호출, 예약/환급, 생성 이력, 비공개 Storage, 스타일·비용 제한을 추가했습니다. 실제 키 없이 CI에서는 Emulator-only mock으로 검증합니다. **실제 Anthropic/Naver 호출·결제·운영 배포는 실행하지 않았습니다.**
 
+**GitHub Actions 고유 앱 57개 + CI 도구 3개 통과**: https://github.com/zaen92/bl_new/actions/runs/43166390306 (앱 코드 `f6f00a0`, 실제 API는 미실행).
+
 현재 사용법·서버 Secret Manager 등록·추정 비용 측정·한계·사진 마이그레이션은 [docs/STEP2.md](docs/STEP2.md), API는 [docs/API.md](docs/API.md), 최신 검증 상태는 [docs/VALIDATION.md](docs/VALIDATION.md)를 참고하세요. 기존 CSS/기기 저장/JSON 백업·복원은 유지합니다.
 
 ## 로컬 mock 실행 (실제 키 불필요)

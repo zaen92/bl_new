@@ -1,16 +1,68 @@
-# STEP 2 구현·검증 진행 — 2026-11-12 (KST)
+# STEP 2 Emulator·mock 검증 완료 — 2026-11-12
 
-기준 `d83f78c`에서 `codex/step2-ai-generation`을 만들었습니다. STEP 1 브랜치는 보존하며 다른 저장소 코드를 통합하지 않았습니다. CSS는 그대로 두고 기존 화면에 생성 상태/이력/스타일/무료 편집을 추가했습니다. 실제 결제·운영 배포·가격 확정은 하지 않습니다.
+**STEP 2의 구현 및 Emulator/mock 필수 검증을 완료했습니다. 실제 유료 API·운영 Firebase 검증/배포는 수행하지 않았습니다.**
 
-로컬: 빌드 통과, 기존 단위 7 통과, 기존 UI 4 통과, provider HTTP-mock 단위 10 통과, CI 도구 3 통과. 실제 API 키가 없고 이 환경 공식 Claude 문서 접속은 403이므로 실제 Claude/Naver API 호출은 미실행입니다. 공식 모델/검색/스트리밍/가격 문서 확인과 실제 Storage/Firestore/Functions 통합은 새 GitHub Actions에서 실행할 예정이며 아직 성공으로 표시하지 않습니다.
+- 기준: `d83f78c`, 작업 브랜치: `codex/step2-ai-generation`.
+- 검증된 앱 코드: `f6f00a0bfe9ccb5e9f805e37503193b3e8125567`.
+- 실제 GitHub Actions: https://github.com/zaen92/bl_new/actions/runs/43166390306
+- Job: https://github.com/zaen92/bl_new/actions/runs/43166390306/job/131009212991
+- 최종 결론: `WORKFLOW_RUN_CONCLUSION_SUCCESS`, 2026-11-12 06:11:44–06:13:58 UTC.
+- GitHub 호스팅 Ubuntu 24.04, Node 22.23.4, Java 21.0.13+9, 두 lockfile `npm ci`, 공식 Firestore/Storage 파일 무결성 확인 후 Auth/Firestore/Functions/Storage Emulator 실행.
+- STEP 1 브랜치 ref는 `d83f78c`로 보존했습니다. 기존 CSS와 STEP 1 workflow 파일은 기준 대비 변경이 없습니다. 다른 프로젝트 통합·결제·가격 확정·공개 배포는 하지 않았습니다.
 
-추가 테스트 정의: provider/JSON/SSE/스타일/키 노출 10, 서버/크레딧/동시성/복구/사진/비용 16, Storage/비용 보안 3, 신규 브라우저 E2E 4. STEP 1 고유 24개와 함께 고유 앱 테스트 **57개**, CI 도구 3개는 별도입니다. 전체 Node 통합 명령은 47개이며 단위 17개는 별도 unit 명령과 중복 집계하지 않습니다.
+## 실제 통과·실패·미실행
 
-가입 무료 지급·원장 정책은 유지했고 가용/무료/유료/held 잔액과 private 작업·비용 문서를 추가했습니다. 외부 호출은 트랜잭션 밖에서, 예약/정산/환급은 트랜잭션 안에서 수행합니다. 사진 quota 예약/실사용 전환과 90일 정리, Auth 삭제 정리를 구현했습니다. SDK 공통 경계와 네이티브 serverTimestamp는 유지합니다. 자세한 스키마·보안·설정·비용 범위는 `docs/STEP2.md`를 참고하세요.
+| 고유 앱 테스트 | 통과 | 실패 | 미실행 |
+|---|---:|---:|---:|
+| STEP 1 기존 단위 | 7 | 0 | 0 |
+| STEP 1 Firestore 보안 | 4 | 0 | 0 |
+| STEP 1 서버 통합 | 7 | 0 | 0 |
+| STEP 1 UI 회귀 | 4 | 0 | 0 |
+| 이메일 / Google Auth Emulator 로그인 | 2 | 0 | 0 |
+| STEP 2 provider HTTP-mock / JSON / SSE / 스타일 / 비밀 노출 검사 | 10 | 0 | 0 |
+| STEP 2 크레딧 / 동시성 / 복구 / 사진 / 비용 서버 통합 | 16 | 0 | 0 |
+| STEP 2 Storage / 비용 데이터 보안 | 3 | 0 | 0 |
+| STEP 2 브라우저 E2E (실제 Emulator + mock worker) | 4 | 0 | 0 |
+| **고유 앱 합계** | **57** | **0** | **0** |
+| 별도 CI 로그 제거·집계·실패 코드 도구 | **3** | **0** | **0** |
 
-STEP 1의 닫힌 requestGeneration assertion은 STEP 2 입력 검증 거부 assertion으로 바꿨으며 case를 삭제/skip하지 않았습니다. createOrder/confirmPayment는 계속 unimplemented입니다. 기존 Firestore chunk 읽기/구 API와 기기 JSON 데이터를 유지합니다.
+`npm test`의 47개는 기존 단위/서버/보안 18 + provider 10 + STEP 2 서버 16 + STEP 2 보안 3입니다. 별도 unit/provider 단계는 같은 case를 재실행하므로 중복 합산하지 않았습니다. 기존 24개도 이 합계에 포함됩니다. 빌드, 공식 API 계약 확인, UI 4, Auth 2, 신규 E2E 4 단계가 모두 success입니다. 성공 수/skip 0/exit code를 CI 도구가 엄격히 검사합니다. 오류 전용 진단 step 및 이미 적중한 캐시 저장 step의 `skipped`는 테스트 생략이 아닙니다.
 
-GitHub CI 실제 결과는 실행 URL과 함께 추후 기록합니다. Mock 통과를 실제 API 통과로 표시하지 않습니다.
+확인 근거는 공개 Actions run/job의 실제 단계 결론과 커밋에 고정된 정확한 expected count 검사입니다. 이 세션에서는 인증이 필요한 원시 로그/artifact를 내려받지 못했으므로, 원시 로그를 읽었다고 주장하지 않습니다. 로그인한 저장소 사용자는 Actions의 `step2-test-evidence-1` artifact에서 가린 로그·수치 receipt·공식 문서 출처 evidence를 확인할 수 있습니다.
+
+## 주요 검증 내용
+
+- 이메일 인증 후 무료 2 지급, 첫 생성 1 / 두 번째 0 / 세 번째 AI 호출 전 차단.
+- 무료 우선 예약, 유료 실패는 유료 bucket 복구, 성공 commit / 실패 refund의 잔액·원장 원자성.
+- 같은 ID 24개 동시 요청 및 worker 24회 전달에서 AI 한 번, 서로 다른 ID 24개에서도 두 크레딧 초과 사용 불가.
+- STEP 1의 동일 이메일/재가입/24개 동시 초기화 무료 중복 지급 방지와 실제 native serverTimestamp 직렬화 회귀 통과.
+- API 오류/잘못된 JSON/빈 응답/거절/토큰 제한, 타임아웃·서버 중단 예약 회수, 24개 복구 worker 이중 환급 방지, 늦은 결과의 재차감 금지.
+- 사진 여러 장·본문 배치·압축·미리보기·무료 저장/사진 재열기, 개별/전체 크기·개수·quota 제한, 90일 미저장 만료·저장 참조 보존·회원 사진 삭제.
+- 직접 Storage 읽기/쓰기 모두 거부, 검증된 소유자의 서버 API 사진 읽기 성공, 타인 거부, 공개 token 미발급.
+- 사용자별 스타일 서버 적용, 브라우저 provider 비밀/직접 URL 부재, 새로고침 후 작업 복구, 무료 편집/저장, 기존 기기 저장/JSON 복원 회귀.
+- 분/일/동시성 및 서비스 예산 제한, 관리자 중지, private 비용 데이터, 알려진 실패 usage와 불완전 스트림의 보수적 비용 추정.
+
+## 발견한 오류와 수정
+
+1. **Emulator 실행 대기**: BooleanParam을 CallableOptions에 전달해 CLI가 `ENFORCE_APP_CHECK` 입력을 기다렸습니다. SDK가 요구하는 실제 boolean으로 바꾸고 환경값 오타를 거부합니다. CI에는 Emulator 값 false를 명시하고 비대화형 실행/전체 제한 시간을 추가했습니다. 실제 환경의 true 설정을 해제한 작업이 아닙니다.
+2. **Storage 공개 토큰 자동 생성**: 첫 완전 통합 실행은 46/47이었고, 소유자의 Firebase REST 읽기 후 token 부재 assertion이 실패했습니다. 직접 Storage 읽기를 소유자에게도 금지하는 강화된 규칙으로 수정했습니다. 이미 소유권을 검사하는 getPost/getGeneration의 Admin 읽기만 사진을 반환하며, 해당 경로와 타인 차단을 실제 Emulator에서 검증했습니다. assertion을 삭제하거나 token URL을 허용하지 않았습니다.
+3. **비용 집계**: web-search 연속 호출의 전체 검색 횟수, 최종 message_delta의 누적 입력 토큰, 실제 성공 응답 횟수를 반영했습니다. 중단 스트림은 알려진 일부 usage가 있어도 비용 확정으로 표시하지 않습니다.
+4. **사진/초안 보존**: 삭제된 사진 그룹의 만료 쿼리 필드를 제거해 정리 작업이 막히지 않게 했고, 글에서 제거된 그룹의 참조/보관 기한을 갱신합니다. 새 결과 적용 전에 작성 중 내용/사진을 기기에 백업합니다. 기존 chunks 읽기와 원본/JSON 데이터는 유지합니다.
+5. **공식 API 확인**: 문서 웹사이트의 응답만으로 모델 지원을 단정하지 않고 공식 Anthropic SDK API 정의를 대체 출처로 검증합니다. CI가 모델/검색/SSE 계약을 확인했고 가격 페이지도 사용 가능했습니다. 가격 페이지 접속 성공은 금액의 수동 검증이나 실제 비용 측정을 의미하지 않습니다.
+
+이전 push 실행은 새 수정 push로 취소됐습니다. 그 안의 실패·시간 초과를 성공으로 바꾸지 않았으며 최종 성공 run과 구분합니다. TLS 무시, 비공식 Emulator, 보안 규칙 완화, case skip은 사용하지 않았습니다.
+
+## 미실행 및 STEP 3 전 남은 실제 환경 검증
+
+| 항목 | 결과 / 필요한 작업 |
+|---|---|
+| 실제 Claude / 네이버 API | **미실행**: 실제 Secret Manager 비밀이 없습니다. 현재 결과는 HTTP-mock 및 Emulator-only mock입니다. 검색 결과/사진 분석/문장 품질·지연은 실제 API로 확인해야 합니다. |
+| 실제 Google OAuth | **미실행**: Auth Emulator 팝업 통과와 별개입니다. 테스트 Firebase의 승인 도메인/Google provider로 확인해야 합니다. |
+| 실제 App Check 강제 적용 | **미실행**: true/false 설정 파싱은 검증했지만 실제 reCAPTCHA 토큰/운영 강제는 테스트 프로젝트에서 확인해야 합니다. |
+| 실제 Storage/IAM/스케줄/Auth 삭제 trigger 운영 동작 | **미실행**: 같은 서버 정리 함수를 Emulator로 검증했습니다. 실제 권한 및 예약 스케줄은 승인된 테스트 배포 후 확인해야 합니다. |
+| 실제 생성당 청구 비용 / 최신 가격 금액 대조 | **미실행**: usage 기반 USD 추정은 검증했습니다. 관리자가 공식 가격을 설정하고 Anthropic usage/청구서와 generationCosts를 대조해야 합니다. |
+
+위 항목은 mock 57개 안의 생략 case가 아니라 별도의 실서비스 검증 범위입니다. STEP 3 결제/상품 가격 확정/운영 배포를 시작하지 않았습니다. 다음 단계 전 별도 테스트 Firebase 연결, 실제 비밀·App Check·IAM·API 품질/비용을 확인해야 합니다. 설정·키 등록·비용 측정 순서는 [STEP2.md](STEP2.md), API는 [API.md](API.md), 스키마는 [SCHEMA.md](SCHEMA.md)에 있습니다.
 
 ---
 

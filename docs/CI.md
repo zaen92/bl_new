@@ -1,3 +1,15 @@
+# STEP 2 CI
+
+`codex/step2-ai-generation` push 또는 Actions → **STEP 2 AI generation mock tests** → Run workflow → 해당 브랜치로 실행합니다. `.github/workflows/step2-tests.yml`은 원래 STEP 1 workflow를 보존한 별도 구성입니다.
+
+공식 Firestore/Storage 준비 후 Auth/Firestore/Functions/Storage를 실행합니다. `npm test` 47, 기존 unit 7/provider 10(중복 실행), UI 4, Auth 2, 신규 E2E 4, CI 도구 3을 검사합니다. 고유 앱 합계 57이며 tool 3은 별도입니다. 실제 API 키나 운영 Firebase가 필요하지 않습니다. mock은 Emulator 밖에서 허용하지 않습니다.
+
+완료 run: https://github.com/zaen92/bl_new/actions/runs/43166390306 . 자세한 결과/미실행 실제 API 범위는 [VALIDATION.md](VALIDATION.md)를 확인하세요. 가린 로그/숫자 receipt만 `step2-test-evidence-1` artifact로 7일 보관하며, 비밀·원시 debug log·브라우저 trace·Emulator 데이터는 업로드하지 않습니다. 실패 시 비밀이 제거된 assertion을 단계 제목/annotation에도 표시합니다. TLS 검증은 유지합니다.
+
+---
+
+## 보존한 STEP 1 CI 안내
+
 # STEP 1 GitHub Actions
 
 Workflow: `.github/workflows/step1-tests.yml` — **STEP 1 Emulator tests**.
