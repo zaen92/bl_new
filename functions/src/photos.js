@@ -36,7 +36,7 @@ export async function uploadPhotos(db,bucket,uid,{requestId,photos:values},{now=
    if(group.data().status!=='deleted')throw new HttpsError('aborted','사진 업로드 처리 중입니다. 잠시 후 상태를 확인하세요.');
   }
   const u=user.data();
-  if((u.storageBytes||0)+(u.storageReservedBytes||0)+total>config.storageQuotaBytes)throw new HttpsError('resource-exhausted','회원 사진 저장 용량 200MiB를 초과합니다.');
+  if((u.storageBytes||0)+(u.storageReservedBytes||0)+total>config.storageQuotaBytes)throw new HttpsError('resource-exhausted','회원 사진 저장 용량 200MB를 초과합니다.');
   tx.set(ref,{uid,objects,bytes:total,fingerprint,status:'uploading',retentionDays:config.retentionDays,savedRefs:0,createdAt:FieldValue.serverTimestamp(),expiresAt:Timestamp.fromMillis(now+config.retentionDays*86400000),uploadDeadline:Timestamp.fromMillis(now+300000)});
   tx.update(user.ref,{storageReservedBytes:(u.storageReservedBytes||0)+total});return false;
  });
@@ -89,7 +89,7 @@ export async function deletePhotoGroup(db,bucket,id,{force=false,now=Date.now()}
    const field=g.data().readyAt?'storageBytes':'storageReservedBytes';
    tx.update(u.ref,{[field]:Math.max(0,(u.data()[field]||0)-g.data().bytes)});
   }
-  tx.update(ref,{status:'deleted',objects:[],deletedAt:FieldValue.serverTimestamp()});
+  tx.update(ref,{status:'deleted',objects:[],expiresAt:FieldValue.delete(),uploadDeadline:FieldValue.delete(),deletedAt:FieldValue.serverTimestamp()});
  });
  return true;
 }

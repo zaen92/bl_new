@@ -1,6 +1,6 @@
 import {spawn} from 'node:child_process';
 import {createInterface} from 'node:readline';
-import {mkdir,readFile,writeFile} from 'node:fs/promises';
+import {mkdir,readFile,writeFile,appendFile} from 'node:fs/promises';
 import {join,resolve} from 'node:path';
 import {sanitizeLog,parseCounts} from './ci-utils.mjs';
 const [stage,command,...args]=process.argv.slice(2);
@@ -39,6 +39,10 @@ if(exitCode!==0){
  const evidence=log.split('\n').filter(line=>/not ok|error:|code:|expected:|actual:|operator:|Error:|Expected|documentation|timeout/i.test(line)).concat(log.split('\n').slice(-30)).join('\n').slice(-16000);
  const safe=sanitizeLog(evidence||`Command failed with exit ${exitCode}`,secrets).replace(/%/g,'%25').replace(/\r/g,'%0D').replace(/\n/g,'%0A');
  console.log(`::error title=${stage} failed::${safe}`);
+ if(process.env.GITHUB_OUTPUT){
+  const diagnostic=sanitizeLog(evidence,secrets).replace(/[\r\n]+/g,' | ').slice(-1800);
+  await appendFile(process.env.GITHUB_OUTPUT,'diagnostic='+diagnostic+'\n');
+ }
 }
 await writeFile(join(directory,`${stage}.log`),log);
 await writeFile(join(directory,`${stage}.json`),JSON.stringify({stage,commit:process.env.GITHUB_SHA || null,startedAt,completedAt:new Date().toISOString(),childExitCode:childExit,exitCode,counts,validationError},null,2)+'\n');

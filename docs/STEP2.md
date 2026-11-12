@@ -52,7 +52,7 @@ Server API는 Auth의 현재 verified/disabled 상태를 확인합니다. `ENFOR
 
 기본 모델 `claude-sonnet-4-6`, 검색 `web_search_20250305`. 모델은 관리자 설정으로 변경할 수 있으나 지원 도구·context 상한·가격을 함께 검토해야 합니다. 현재 기본 추정가는 input 3 / output 15 USD per million tokens, search 0.01 USD입니다. 금액은 USD micros 정수로 기록합니다. 일일 AI 비용 한도 기본 $20이며, 최대 context·연속 요청·출력·검색의 보수적 비용을 미리 예약합니다. 이것은 Cloud Billing 청구서/Storage/Functions/Firestore 전체 비용의 강제 상한이 아닙니다.
 
-응답 중 실제 관측한 usage로 추정 비용을 정산합니다. 실패해도 관측 usage는 기록하고, 청구 여부를 알 수 없는 전송 중단은 예약 상한으로 보수적으로 잡으며 estimated=true로 표시합니다. 늦은 실제 usage가 도착하면 비용만 보정하고 환급된 크레딧을 다시 차감하지 않습니다. 실제 청구액은 Anthropic 청구서와 대조해야 합니다. 관리자 `enabled=false`는 신규 및 아직 provider를 시작하지 않은 작업을 막습니다. 이미 외부 API가 시작된 요청을 즉시 되돌릴 수는 없습니다.
+응답 중 실제 관측한 usage로 추정 비용을 정산합니다. 실패해도 관측 usage는 기록합니다. 종료 이벤트 없이 스트림이 끊기면 관측 토큰이 일부 있어도 불완전한 비용으로 보고, 청구 여부를 알 수 없는 전송 중단은 예약 상한으로 보수적으로 잡으며 estimated=true로 표시합니다. 늦은 실제 usage가 도착하면 비용만 보정하고 환급된 크레딧을 다시 차감하지 않습니다. 실제 청구액은 Anthropic 청구서와 대조해야 합니다. 관리자 `enabled=false`는 신규 및 아직 provider를 시작하지 않은 작업을 막습니다. 이미 외부 API가 시작된 요청을 즉시 되돌릴 수는 없습니다.
 
 ## 실제 Firebase/Secret Manager 설정 (배포 실행 아님)
 

@@ -71,11 +71,11 @@ async function settle(db,id,{result=null,errorCode=null,usage=null,provider='unk
   const user=await tx.get(db.doc(`users/${v.uid}`));
   const canFinish=!terminal(v.status)&&(!attempt||v.attempt===attempt);
   // Unknown provider failures are conservatively charged at the reservation bound.
-  const actual=usage?usageCost(v.config,usage):v.providerAttempted?v.budgetReservedMicros:0;
+  const actual=usage&&!usage.uncertain?usageCost(v.config,usage):v.providerAttempted?v.budgetReservedMicros:0;
   if(!canFinish){
-   if(usage&&cost.exists&&cost.data().estimated){
+   if(usage&&!usage.uncertain&&cost.exists&&cost.data().estimated){
     const previous=cost.data().chargedMicros;
-    tx.update(costRef,{usage,chargedMicros:actual,estimated:false,provider,updatedAt:FieldValue.serverTimestamp()});
+    tx.update(costRef,{usage,chargedMicros:actual,estimated:false,provider,providerCalls:usage.apiRequests??cost.data().providerCalls,updatedAt:FieldValue.serverTimestamp()});
     tx.update(budgetRef,{spentMicros:Math.max(0,(budget.data()?.spentMicros||0)-previous+actual)});
    }
    return false;
@@ -93,7 +93,7 @@ async function settle(db,id,{result=null,errorCode=null,usage=null,provider='unk
   }
   tx.update(ref,{status:success?'succeeded':'failed_refunded',phase:success?'completed':'refunded',result:result||null,provider,leaseUntil:FieldValue.delete(),
    errorCode:success?null:errorCode||'generation_failed',partialText:FieldValue.delete(),completedAt:stamp,updatedAt:stamp});
-  tx.set(costRef,{uid:v.uid,generationId:id,provider,pricing:{inputMicrosPerToken:v.config.inputMicrosPerToken,outputMicrosPerToken:v.config.outputMicrosPerToken,searchMicros:v.config.searchMicros},usage,chargedMicros:actual,estimated:!usage,providerCalls:usage?.apiRequests??(v.providerAttempted?1:0),
+  tx.set(costRef,{uid:v.uid,generationId:id,provider,pricing:{inputMicrosPerToken:v.config.inputMicrosPerToken,outputMicrosPerToken:v.config.outputMicrosPerToken,searchMicros:v.config.searchMicros},usage,chargedMicros:actual,estimated:!usage||!!usage.uncertain,providerCalls:usage?.apiRequests??(v.providerAttempted?1:0),
    reservationMicros:v.budgetReservedMicros,errorCode:errorCode||null,createdAt:stamp});
   const b=budget.data()||{};
   tx.set(budgetRef,{day:v.day,reservedMicros:Math.max(0,(b.reservedMicros||0)-v.budgetReservedMicros),spentMicros:(b.spentMicros||0)+actual});

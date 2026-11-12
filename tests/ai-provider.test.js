@@ -46,6 +46,8 @@ test('refusal, malformed JSON, HTTP failure and token limit errors keep safe cod
   const p=anthropicProvider({apiKey:'test',fetcher:async url=>url.endsWith('count_tokens')?Response.json({input_tokens:2}):new Response(stream(text,stop))});
   await assert.rejects(p({input,style:{},config:DEFAULT_AI_CONFIG,photos:[],onProgress:async()=>{},signal:new AbortController().signal}),e=>e.code===code&&e.usage.outputTokens===300);
  }
+ const interrupted=anthropicProvider({apiKey:'test',fetcher:async url=>url.endsWith('count_tokens')?Response.json({input_tokens:2}):new Response('data: '+JSON.stringify({type:'message_start',message:{usage:{input_tokens:2}}})+'\n\n')});
+ await assert.rejects(interrupted({input,style:{},config:DEFAULT_AI_CONFIG,photos:[],onProgress:async()=>{},signal:new AbortController().signal}),e=>e.code==='incomplete_response'&&e.usage.uncertain===true);
  const p=anthropicProvider({apiKey:'test',fetcher:async url=>url.endsWith('count_tokens')?Response.json({input_tokens:9999999}):new Response('',{status:401})});
  await assert.rejects(p({input,style:{},config:DEFAULT_AI_CONFIG,photos:[],onProgress:async()=>{},signal:new AbortController().signal}),{code:'input_token_limit'});
 });

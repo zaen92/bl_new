@@ -113,13 +113,22 @@ jobs:
         if: ${{ !cancelled() && steps.prepare.outcome == 'success' && steps.test-key.outcome == 'success' }}
         run: node scripts/ci-run.mjs step2-integration timeout --signal=TERM --kill-after=20s 6m npm test
 
+      - name: 'Integration diagnostic: ${{ steps.integration.outputs.diagnostic }}'
+        if: ${{ !cancelled() && steps.integration.outcome == 'failure' }}
+        run: echo 'Integration failed; sanitized detail is in this step title and the test artifact.'
+
       - name: Build
         if: ${{ !cancelled() && steps.deps.outcome == 'success' }}
         run: node scripts/ci-run.mjs build npm run build
 
       - name: Verify current official Anthropic model, tool, streaming and pricing docs
+        id: official-docs
         if: ${{ !cancelled() && steps.deps.outcome == 'success' }}
         run: node scripts/ci-run.mjs official-docs node scripts/verify-anthropic-docs.mjs
+
+      - name: 'Official docs diagnostic: ${{ steps.official-docs.outputs.diagnostic }}'
+        if: ${{ !cancelled() && steps.official-docs.outcome == 'failure' }}
+        run: echo 'Official documentation verification failed; no live API verification is implied.'
 
       - name: Provider protocol and personalization unit tests (mock HTTP only)
         if: ${{ !cancelled() && steps.deps.outcome == 'success' }}

@@ -68,9 +68,9 @@ export function anthropicProvider({apiKey,naverId,naverSecret,fetcher=fetch}){
     if(!count.ok)throw new ProviderError('token_count_failed');
     const tokens=(await count.json()).input_tokens;
     if(!Number.isSafeInteger(tokens)||tokens<0||tokens>(round===0?config.maxInputTokens:config.maxBillableInputTokens))throw new ProviderError('input_token_limit');
-    generationSent=true;
+    generationSent=true;usage.uncertain=true;
     const response=await fetcher('https://api.anthropic.com/v1/messages',{method:'POST',headers,signal,body:JSON.stringify({...current,max_tokens:Math.max(1,config.maxOutputTokens-usage.outputTokens),stream:true})});
-    if(!response.ok)throw new ProviderError('provider_http_'+response.status,response.status>=400&&response.status<500?{...usage}:null);
+    if(!response.ok)throw new ProviderError('provider_http_'+response.status,response.status>=400&&response.status<500?{...usage,uncertain:false}:null);
     counted=true;usage.apiRequests++;
     const blocks=[];let roundOutput=0;stop=null;
     for await(const event of readSSE(response.body)){
@@ -97,6 +97,7 @@ export function anthropicProvider({apiKey,naverId,naverSecret,fetcher=fetch}){
      }
     }
     usage.outputTokens+=roundOutput;
+    usage.uncertain=stop===null;
     if(usage.inputTokens>config.maxBillableInputTokens*config.maxProviderRequests||usage.outputTokens>config.maxOutputTokens||usage.searches>config.maxSearches)throw new ProviderError('usage_limit');
     if(stop==='end_turn')break;
     if(stop!=='pause_turn')throw new ProviderError(stop==='refusal'?'refusal':stop==='max_tokens'?'output_token_limit':'incomplete_response');

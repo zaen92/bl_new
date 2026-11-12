@@ -329,7 +329,7 @@ for(const key of ['jaeinit_claude_key','jaeinit_naver_id','jaeinit_naver_sec'])l
 generationUI=initGenerationUI({onError:setError,onResult:async full=>{
   await photoQueue;
   if(auth.currentUser?.uid!==full.uid)return;
-  if(resultData)await putLocalPost({...snapshot(),id:crypto.randomUUID(),title:'생성 전 결과 자동 백업',date:new Date().toLocaleString('ko-KR')});
+  if(resultData||imgs.length||['ti','mi','ci','ii'].some(id=>g(id).value))await putLocalPost({...snapshot(),id:crypto.randomUUID(),title:'생성 전 작성 내용 자동 백업',date:new Date().toLocaleString('ko-KR')});
   const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(full.imgs)));
   const generationPhotoDigest=[...new Uint8Array(digest)].map(b=>b.toString(16).padStart(2,'0')).join('');
   applySnapshot({form:{ti:full.input.title,mi:full.input.memo,ci:full.input.content,ii:full.input.placeInfo},type:full.input.type,volume:full.input.volume,imgs:full.imgs,data:full.result,generationId:full.id,ownerUid:full.uid,generationPhotoDigest});

@@ -42,6 +42,8 @@ test('API failure refunds the exact paid credit type and records known partial c
  await run(g.generationId,async()=>{throw new ProviderError('provider_http_500',{inputTokens:20,outputTokens:3,searches:0});});
  const u=await user();assert.equal(u.credits,1);assert.equal(u.paidCredits,1);assert.equal(u.freeCredits,0);assert.equal(u.heldPaid,0);
  const cost=(await db.doc(`generationCosts/${g.generationId}`).get()).data();assert.equal(cost.chargedMicros,105);assert.equal(cost.estimated,false);
+ const interrupted=await reserve('partial-error');await run(interrupted.generationId,async()=>{throw new ProviderError('incomplete_response',{inputTokens:20,outputTokens:0,searches:0,uncertain:true});});
+ const uncertain=(await db.doc(`generationCosts/${interrupted.generationId}`).get()).data();assert.equal(uncertain.estimated,true);assert.equal(uncertain.chargedMicros,maxCost(DEFAULT_AI_CONFIG));assert.equal((await user()).paidCredits,1);
 });
 test('24 duplicate requests and worker deliveries invoke AI once and reserve/commit once',async()=>{
  const accepted=await Promise.all(Array.from({length:24},()=>reserve('same')));
@@ -109,6 +111,8 @@ test('multiple photos stay private, preserve ordered placement and survive saved
  const photos=await loadPhotos(db,bucket,uid,post.photoGroupId);assert.equal(photos.length,2);assert.equal(photos[0].buffer.toString('base64'),png.split(',')[1]);
  const group=(await db.doc(`photoGroups/${post.photoGroupId}`).get()).data();assert.equal(group.savedRefs,1);
  for(const object of group.objects){const [metadata]=await bucket.file(object.path).getMetadata();assert.ok(!metadata.metadata?.firebaseStorageDownloadTokens);}
+ await saveStoragePost(db,uid,{id:'post-'+uid,requestId:'remove-photos',expectedVersion:1,post:{title:'사진 없는 수정',data,imgs:[]}});
+ const detached=(await db.doc(`photoGroups/${uploaded.photoGroupId}`).get()).data();assert.equal(detached.savedRefs,0);assert.ok(detached.expiresAt instanceof Timestamp);
 });
 test('quota reservation rejects excess count/size and a second upload over user quota',async()=>{
  await assert.rejects(uploadPhotos(db,bucket,uid,{requestId:'too-many',photos:Array(11).fill(png)}),{code:'invalid-argument'});

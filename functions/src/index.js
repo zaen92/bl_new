@@ -43,7 +43,7 @@ export const ensureProfile = onCall({...options, secrets: [identityKey]}, async 
 export const savePost = onCall(options, async request => {
   const user = await member(request);
   const data=request.data;
-  return data?.photoGroupId||data?.generationId?saveStoragePost(db,user.uid,data):saveOwnedPost(db,user.uid,data);
+  return data?.photoGroupId||data?.generationId||!data?.post?.imgs?.length?saveStoragePost(db,user.uid,data):saveOwnedPost(db,user.uid,data);
 });
 export const getPost = onCall(options, async request => {
   const user = await member(request);

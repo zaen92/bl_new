@@ -46,6 +46,11 @@ export async function saveOwnedPost(db, uid, input) {
     if (old.exists && old.data().lastRequestId === requestId) return {id, version: old.data().version};
     if ((old.data()?.version ?? 0) !== expectedVersion) throw new HttpsError('aborted','다른 기기에서 수정되었습니다. 새로 불러오세요.');
     const oldChunks = await tx.get(ref.collection('photoChunks'));
+    const oldGroup=old.data()?.photoGroupId?await tx.get(db.doc(`photoGroups/${old.data().photoGroupId}`)):null;
+    if(oldGroup?.exists){
+      const refs=Math.max(0,(oldGroup.data().savedRefs||0)-1);
+      tx.update(oldGroup.ref,{savedRefs:refs,...(refs===0?{expiresAt:Timestamp.fromMillis(Date.now()+(oldGroup.data().retentionDays||90)*86400000)}:{})});
+    }
     const version = expectedVersion + 1;
     tx.set(ref, {...post, uid, photoCount: photos.length, version, lastRequestId: requestId,
       createdAt: old.data()?.createdAt ?? FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp()});
@@ -97,7 +102,7 @@ export async function saveStoragePost(db,uid,input){
    const refs=Math.max(0,(oldGroup.data().savedRefs||0)-1);
    tx.update(oldGroup.ref,{savedRefs:refs,...(refs===0?{expiresAt:Timestamp.fromMillis(Date.now()+(oldGroup.data().retentionDays||90)*86400000)}:{})});
   }
-  tx.set(ref,{...post,uid,photoGroupId,generationId:input.generationId||null,photoCount:newGroup?.data()?.objects.length||0,
+  tx.set(ref,{...post,schemaVersion:2,uid,photoGroupId,generationId:input.generationId||null,photoCount:newGroup?.data()?.objects.length||0,
    version:expectedVersion+1,lastRequestId:requestId,createdAt:old.data()?.createdAt??FieldValue.serverTimestamp(),updatedAt:FieldValue.serverTimestamp()});
   for(const chunk of chunks.docs)tx.delete(chunk.ref);
   return {id,version:expectedVersion+1};
