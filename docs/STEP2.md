@@ -50,13 +50,13 @@ Server API는 Auth의 현재 verified/disabled 상태를 확인합니다. `ENFOR
 
 기본 분당 3 / UTC 하루 20 / 동시 2입니다. `ops/ai`의 검증된 관리자 설정에서 변경합니다. 입력은 count_tokens로 사전 확인하고 기본 48,000 tokens, 출력 전체 8,192 tokens, 검색 3회, provider message 요청 최대 3회, 120초 제한입니다. 서버 worker timeout보다 긴 보수적 lease 후 복구합니다.
 
-기본 모델 `claude-sonnet-4-6`, 검색 `web_search_20250305`. 모델은 관리자 설정으로 변경할 수 있으나 지원 도구·context 상한·가격을 함께 검토해야 합니다. 현재 기본 추정가는 input 3 / output 15 USD per million tokens, search 0.01 USD입니다. 금액은 USD micros 정수로 기록합니다. 일일 AI 비용 한도 기본 $20이며, 최대 context·연속 요청·출력·검색의 보수적 비용을 미리 예약합니다. 이것은 Cloud Billing 청구서/Storage/Functions/Firestore 전체 비용의 강제 상한이 아닙니다.
+기본 모델 `claude-sonnet-4-6`, 검색 `web_search_20250305`. 모델은 관리자 설정으로 변경할 수 있으나 지원 도구·context 상한·가격을 함께 검토해야 합니다. 가격 웹페이지는 현재 환경에서 검증하지 못했습니다. 아래 금액은 운영자가 공식 가격/청구서와 대조해야 하는 구성 가능한 추정값입니다. 현재 기본 추정가는 input 3 / output 15 USD per million tokens, search 0.01 USD입니다. 금액은 USD micros 정수로 기록합니다. 일일 AI 비용 한도 기본 $20이며, 최대 context·연속 요청·출력·검색의 보수적 비용을 미리 예약합니다. 이것은 Cloud Billing 청구서/Storage/Functions/Firestore 전체 비용의 강제 상한이 아닙니다.
 
 응답 중 실제 관측한 usage로 추정 비용을 정산합니다. 실패해도 관측 usage는 기록합니다. 종료 이벤트 없이 스트림이 끊기면 관측 토큰이 일부 있어도 불완전한 비용으로 보고, 청구 여부를 알 수 없는 전송 중단은 예약 상한으로 보수적으로 잡으며 estimated=true로 표시합니다. 늦은 실제 usage가 도착하면 비용만 보정하고 환급된 크레딧을 다시 차감하지 않습니다. 실제 청구액은 Anthropic 청구서와 대조해야 합니다. 관리자 `enabled=false`는 신규 및 아직 provider를 시작하지 않은 작업을 막습니다. 이미 외부 API가 시작된 요청을 즉시 되돌릴 수는 없습니다.
 
 ## 실제 Firebase/Secret Manager 설정 (배포 실행 아님)
 
-1. 별도 테스트 Firebase 프로젝트에서 Auth/Firestore/Storage를 활성화하고 해당 bucket 이름을 확인합니다. 기존 프로젝트 Web 공개 설정은 `.env.local`; 실제 provider 비밀은 넣지 않습니다.
+1. 실제 Functions/Storage/스케줄을 사용하는 별도 테스트 프로젝트는 Blaze와 관련 IAM 설정을 준비합니다. 이 작업에서는 활성화/배포하지 않았습니다. 별도 테스트 Firebase 프로젝트에서 Auth/Firestore/Storage를 활성화하고 해당 bucket 이름을 확인합니다. 기존 프로젝트 Web 공개 설정은 `.env.local`; 실제 provider 비밀은 넣지 않습니다.
 2. Firebase Secret Manager에 CLI 보안 프롬프트로 `CLAUDE_API_KEY`, `NAVER_CLIENT_ID`, `NAVER_CLIENT_SECRET`, 기존 `SIGNUP_IDENTITY_HMAC_KEY`를 등록합니다. 예: `firebase functions:secrets:set CLAUDE_API_KEY --project TEST_PROJECT_ID`. 값은 채팅/명령행 인수/소스에 넣지 않습니다.
 3. 비밀이 아닌 Functions 환경 설정 `functions/.env.TEST_PROJECT_ID`에 `AI_PROVIDER_MODE=anthropic`, `STORAGE_BUCKET=실제_bucket`, 필요 시 `ENFORCE_APP_CHECK=true`를 설정합니다. HMAC 키를 재생성하지 않습니다. 아직 실제 배포는 하지 않았습니다.
 4. `firestore.rules`, `firestore.indexes.json`, `storage.rules`, Functions 스케줄/Firestore/Auth 트리거와 Storage/Firestore 서비스 권한을 승인된 배포 단계에서 적용합니다. Storage Rules의 cross-Firestore 조회 권한과 bucket CORS는 실제 테스트 프로젝트에서 확인해야 합니다.
@@ -65,6 +65,10 @@ Server API는 Auth의 현재 verified/disabled 상태를 확인합니다. `ENFOR
 
 ## Mock 및 CI
 
-Mock은 `FUNCTIONS_EMULATOR=true`인 경우에만 `AI_PROVIDER_MODE=mock`으로 허용합니다. 기본 disabled이며 실제 환경에서 mock으로 성공을 가장하지 않습니다. CI는 가짜 키 placeholder와 Emulator만 사용합니다. `AI_MOCK_DELAY_MS`는 Emulator E2E 지연 재현용이며 실제 provider에 영향을 주지 않습니다.
+Mock은 `FUNCTIONS_EMULATOR=true`인 경우에만 `AI_PROVIDER_MODE=mock`으로 허용합니다. 기본 disabled이며 실제 환경에서 mock으로 성공을 가장하지 않습니다. CI는 가짜 키 placeholder와 Emulator만 사용합니다. 비대화형 CLI가 false 기본값 입력을 기다리지 않도록 `functions/.env.local`에 `ENFORCE_APP_CHECK=false`를 명시합니다. 운영 설정을 바꾸는 작업이 아닙니다. `AI_MOCK_DELAY_MS`는 Emulator E2E 지연 재현용이며 실제 provider에 영향을 주지 않습니다.
 
 STEP 1 workflow/브랜치는 보존합니다. Step 2에서는 `step2-tests.yml`을 사용해 Storage를 포함한 실제 Emulator와 mock provider를 검증합니다. 테스트 수와 실제 실행 결과는 `VALIDATION.md`에 별도로 기록합니다. 실제 Google OAuth/Anthropic 유료 호출/생산 IAM은 통과로 집계하지 않습니다.
+
+## 공식 API 계약 확인 출처
+
+공식 문서 사이트가 차단될 때는 Anthropic 공식 SDK의 공개 API 정의만 읽어 model/tool/SSE 계약을 확인합니다: https://github.com/anthropics/anthropic-sdk-typescript/blob/main/src/resources/messages/messages.ts . `claude-sonnet-4-6`, `web_search_20250305`(및 최신 20260209 정의), `content_block_delta`를 확인했습니다. 다운로드한 소스는 프로젝트에 통합하지 않습니다. CI evidence에는 출처 URL·시각·SHA-256과 웹사이트 접근 결과를 구분해 기록합니다. 이 확인은 실제 모델 호출/가격/성능 검증을 대신하지 않습니다.

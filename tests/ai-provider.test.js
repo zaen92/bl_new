@@ -10,7 +10,7 @@ const stream=(text,stop='end_turn')=>[
  {type:'message_start',message:{usage:{input_tokens:200}}},
  {type:'content_block_start',content_block:{type:'server_tool_use',name:'web_search'}},
  {type:'content_block_delta',delta:{text}},
- {type:'message_delta',delta:{stop_reason:stop},usage:{output_tokens:300}}
+ {type:'message_delta',delta:{stop_reason:stop},usage:{input_tokens:230,output_tokens:300,server_tool_use:{web_search_requests:1}}}
 ].map(e=>'data: '+JSON.stringify(e)+'\n\n').join('');
 test('AI result JSON requires all original fields and rejects malformed or empty output',()=>{
  const result=fixture();assert.deepEqual(parseResult(JSON.stringify(result)),result);
@@ -33,7 +33,7 @@ test('Anthropic adapter mock HTTP counts tokens and streams supported model/sear
  const outcome=await provider({input,style:validateStyle({greeting:'제 인사'}),config:DEFAULT_AI_CONFIG,photos:[{mime:'image/png',buffer:Buffer.from('fixture')}],signal:new AbortController().signal,onProgress:async p=>progress.push(p)});
  assert.equal(calls.length,2);assert.equal(calls[1].payload.model,'claude-sonnet-4-6');
  assert.equal(calls[1].payload.tools[0].type,'web_search_20250305');assert.equal(calls[1].payload.tools[0].max_uses,3);
- assert.equal(calls[1].payload.messages[0].content[0].type,'image');assert.equal(outcome.usage.searches,1);assert.equal(outcome.usage.outputTokens,300);assert.ok(progress.length>=2);
+ assert.equal(calls[1].payload.messages[0].content[0].type,'image');assert.equal(outcome.usage.inputTokens,230);assert.equal(outcome.usage.searches,1);assert.equal(outcome.usage.outputTokens,300);assert.ok(progress.length>=2);
 });
 test('Naver local search stays server-side and normalizes location data',async()=>{
  let received;
@@ -81,7 +81,7 @@ test('official web-search pause_turn is continued with bounded requests and aggr
   return new Response(stream(rounds===1?'':JSON.stringify(fixture()),rounds===1?'pause_turn':'end_turn'));
  }});
  const result=await provider({input,style:{},config:DEFAULT_AI_CONFIG,photos:[],signal:new AbortController().signal,onProgress:async()=>{}});
- assert.equal(rounds,2);assert.equal(requests[1].messages[1].role,'assistant');assert.equal(result.usage.apiRequests,2);assert.equal(result.usage.outputTokens,600);
+ assert.equal(rounds,2);assert.equal(requests[1].messages[1].role,'assistant');assert.equal(result.usage.apiRequests,2);assert.equal(result.usage.outputTokens,600);assert.equal(result.usage.inputTokens,460);
  const stopped=anthropicProvider({apiKey:'test',fetcher:async url=>url.endsWith('count_tokens')?Response.json({input_tokens:1}):new Response(stream('','pause_turn'))});
  await assert.rejects(stopped({input,style:{},config:{...DEFAULT_AI_CONFIG,maxProviderRequests:1},photos:[],signal:new AbortController().signal,onProgress:async()=>{}}),{code:'continuation_limit'});
 });

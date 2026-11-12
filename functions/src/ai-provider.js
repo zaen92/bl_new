@@ -72,13 +72,13 @@ export function anthropicProvider({apiKey,naverId,naverSecret,fetcher=fetch}){
     const response=await fetcher('https://api.anthropic.com/v1/messages',{method:'POST',headers,signal,body:JSON.stringify({...current,max_tokens:Math.max(1,config.maxOutputTokens-usage.outputTokens),stream:true})});
     if(!response.ok)throw new ProviderError('provider_http_'+response.status,response.status>=400&&response.status<500?{...usage,uncertain:false}:null);
     counted=true;usage.apiRequests++;
-    const blocks=[];let roundOutput=0;stop=null;
+    const blocks=[];let roundOutput=0,roundInput=0,roundSearches=0;const inputBefore=usage.inputTokens,outputBefore=usage.outputTokens,searchesBefore=usage.searches;stop=null;
     for await(const event of readSSE(response.body)){
      if(event.type==='error')throw new ProviderError('provider_stream_error');
-     if(event.type==='message_start')usage.inputTokens+=event.message?.usage?.input_tokens||0;
+     if(event.type==='message_start'){roundInput=event.message?.usage?.input_tokens||0;roundOutput=event.message?.usage?.output_tokens||0;usage.inputTokens=inputBefore+roundInput;usage.outputTokens=outputBefore+roundOutput;}
      if(event.type==='content_block_start'){
       blocks[event.index??blocks.length]=structuredClone(event.content_block);
-      if(event.content_block?.type==='server_tool_use'&&event.content_block?.name==='web_search')usage.searches++;
+      if(event.content_block?.type==='server_tool_use'&&event.content_block?.name==='web_search'){roundSearches++;usage.searches=searchesBefore+roundSearches;}
      }
      if(event.type==='content_block_delta'){
       const block=blocks[event.index];
@@ -93,10 +93,13 @@ export function anthropicProvider({apiKey,naverId,naverSecret,fetcher=fetch}){
      }
      if(event.type==='message_delta'){
       roundOutput=event.usage?.output_tokens??roundOutput;
+      roundInput=event.usage?.input_tokens??roundInput;
+      roundSearches=Math.max(roundSearches,event.usage?.server_tool_use?.web_search_requests||0);
+      usage.inputTokens=inputBefore+roundInput;usage.outputTokens=outputBefore+roundOutput;usage.searches=searchesBefore+roundSearches;
       stop=event.delta?.stop_reason??stop;
      }
     }
-    usage.outputTokens+=roundOutput;
+    usage.outputTokens=outputBefore+roundOutput;
     usage.uncertain=stop===null;
     if(usage.inputTokens>config.maxBillableInputTokens*config.maxProviderRequests||usage.outputTokens>config.maxOutputTokens||usage.searches>config.maxSearches)throw new ProviderError('usage_limit');
     if(stop==='end_turn')break;

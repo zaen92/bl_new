@@ -103,7 +103,7 @@ jobs:
           import {randomBytes} from 'node:crypto';
           import {writeFileSync} from 'node:fs';
           writeFileSync('functions/.secret.local', 'SIGNUP_IDENTITY_HMAC_KEY='+randomBytes(32).toString('hex')+'\nCLAUDE_API_KEY=ci-mock-not-a-real-key\nNAVER_CLIENT_ID=ci-mock-not-a-real-id\nNAVER_CLIENT_SECRET=ci-mock-not-a-real-secret\n', {mode:0o600,flag:'wx'});
-          writeFileSync('functions/.env.local', 'AI_PROVIDER_MODE=mock\nAI_MOCK_DELAY_MS=0\n');
+          writeFileSync('functions/.env.local', 'AI_PROVIDER_MODE=mock\nAI_MOCK_DELAY_MS=0\nENFORCE_APP_CHECK=false\n');
           NODE
 
       # Prioritize the previously unrun 4 security + 7 server tests.
@@ -121,10 +121,14 @@ jobs:
         if: ${{ !cancelled() && steps.deps.outcome == 'success' }}
         run: node scripts/ci-run.mjs build npm run build
 
-      - name: Verify current official Anthropic model, tool, streaming and pricing docs
+      - name: Verify official Anthropic API contracts and record pricing availability
         id: official-docs
         if: ${{ !cancelled() && steps.deps.outcome == 'success' }}
         run: node scripts/ci-run.mjs official-docs node scripts/verify-anthropic-docs.mjs
+
+      - name: 'Pricing webpage evidence: ${{ steps.official-docs.outputs.pricing }}'
+        if: ${{ !cancelled() && steps.official-docs.outcome == 'success' }}
+        run: echo 'Only verified sources are claimed; live API and billing remain untested.'
 
       - name: 'Official docs diagnostic: ${{ steps.official-docs.outputs.diagnostic }}'
         if: ${{ !cancelled() && steps.official-docs.outcome == 'failure' }}

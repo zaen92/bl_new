@@ -9,4 +9,7 @@ case "${1:-}" in
     node scripts/prepare-emulators.mjs --preflight "$@"
     ;;
 esac
+if [ "${CI:-}" = "true" ]; then
+  set -- "$@" --non-interactive
+fi
 exec firebase "$@"

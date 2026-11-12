@@ -117,6 +117,10 @@ test('multiple photos stay private, preserve ordered placement and survive saved
 test('quota reservation rejects excess count/size and a second upload over user quota',async()=>{
  await assert.rejects(uploadPhotos(db,bucket,uid,{requestId:'too-many',photos:Array(11).fill(png)}),{code:'invalid-argument'});
  await assert.rejects(uploadPhotos(db,bucket,uid,{requestId:'bad',photos:['data:image/svg+xml;base64,PHN2Zz4=']}),{code:'invalid-argument'});
+ const oversized=Buffer.alloc(DEFAULT_AI_CONFIG.maxPhotoBytes+1);Buffer.from(png.split(',')[1],'base64').copy(oversized);
+ await assert.rejects(uploadPhotos(db,bucket,uid,{requestId:'oversized',photos:['data:image/png;base64,'+oversized.toString('base64')]}),{code:'invalid-argument'});
+ const medium=oversized.subarray(0,1800000).toString('base64');
+ await assert.rejects(uploadPhotos(db,bucket,uid,{requestId:'total-limit',photos:Array(4).fill('data:image/png;base64,'+medium)}),{code:'invalid-argument'});
  const bytes=Buffer.from(png.split(',')[1],'base64').length;
  await db.doc('ops/ai').set({...DEFAULT_AI_CONFIG,storageQuotaBytes:bytes});
  await uploadPhotos(db,bucket,uid,{requestId:'one',photos:[png]},{now});
@@ -129,7 +133,7 @@ test('unsaved photos expire after 90 days while saved references remain retained
  const g=await reserve('save-retain',uid,{photoGroupId:saved.photoGroupId});await run(g.generationId);
  await saveStoragePost(db,uid,{id:'retained-'+uid,requestId:'retain',expectedVersion:0,generationId:g.generationId,post:{title:'보관',data:(await record(g.generationId)).result}});
  await cleanupPhotos(db,bucket,{now:now+91*86400000});
- assert.equal((await db.doc(`photoGroups/${first.photoGroupId}`).get()).data().status,'deleted');
+ const deleted=(await db.doc(`photoGroups/${first.photoGroupId}`).get()).data();assert.equal(deleted.status,'deleted');assert.equal(deleted.expiresAt,undefined);assert.equal(deleted.uploadDeadline,undefined);
  assert.equal((await loadPhotos(db,bucket,uid,saved.photoGroupId)).length,1);
  const quota=(await user()).storageBytes;
  await Promise.all(Array.from({length:8},()=>deletePhotoGroup(db,bucket,first.photoGroupId,{force:true})));

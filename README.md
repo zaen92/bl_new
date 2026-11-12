@@ -8,7 +8,7 @@
 
 1. 두 lockfile 의존성을 설치합니다: `npm ci`, `npm --prefix functions ci`.
 2. 기존 `functions/.secret.local` 가입 HMAC 키는 보존합니다. 테스트용 로컬 파일에 빠진 이름만 placeholder로 추가합니다: `CLAUDE_API_KEY=emulator-only`, `NAVER_CLIENT_ID=emulator-only`, `NAVER_CLIENT_SECRET=emulator-only`. 실제 API 키를 여기에 쓰지 마세요.
-3. Git 제외 `functions/.env.local`에 `AI_PROVIDER_MODE=mock`을 설정합니다. mock은 Emulator에서만 허용하며 기본은 disabled입니다.
+3. Git 제외 `functions/.env.local`에 `AI_PROVIDER_MODE=mock`, `AI_MOCK_DELAY_MS=0`, `ENFORCE_APP_CHECK=false`를 명시합니다. `scripts/local-setup.sh`는 기존 값을 덮어쓰지 않고 누락된 Emulator 전용 placeholder를 준비합니다. mock은 Emulator에서만 허용하며 기본은 disabled입니다.
 4. 정상 다운로드가 가능한 환경에서 `npm run emulators:prepare -- --storage` 후 `npm run emulators`, 다른 터미널에서 `npm run dev`를 실행합니다. 코덱스의 기존 제한 환경에서 다운로드를 반복하지 말고 GitHub Actions의 **STEP 2 AI generation mock tests**를 사용하세요.
 5. `npm run test:step2:unit`은 외부 HTTP mock 10개입니다. `npm test`는 Storage까지 포함한 Emulator 47개, `npm run test:step2:e2e`는 실제 Emulator + mock worker 브라우저 4개입니다. 기존 단위/UI/Auth 검증도 유지합니다.
 
