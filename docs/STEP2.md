@@ -41,7 +41,7 @@
 - JSON: 브라우저에서 텍스트 전용 파일을 생성/검증/해시한 후 서버 approveJSONExport 승인을 받습니다. 승인 ID/digest/bytes가 같으면 재시도 시 추가 집계하지 않습니다. 다른 파일은 같은 승인을 재사용할 수 없습니다. FREE는 누적 5, 월 리셋 없음. 다운로드 click 이후 pending ID를 지우며 실제 디스크 저장 완료는 보장할 수 없습니다. 승인 직후 페이지가 종료되면 해당 승인은 사용된 것으로 남을 수 있습니다.
 - exportsUsed는 영구 signup claim에도 기록해 이메일 재가입으로 초기화하지 않습니다. 같은 글을 새 승인 ID로 다시 내보내면 새 1회입니다. UI 밖에서 사용자 자신이 텍스트를 복사/재구성하는 행위를 차단하지 않습니다.
 - JSON/기기 저장 whitelist는 API 키·토큰·tier·관리자 claim·credits·원장·주문·카운터·cloudLinks·legacyRaw·이미지를 제외합니다. 과거 JSON의 imgs는 무시하고 텍스트/유형/분량/폼/스타일/배치를 복원합니다. 파일 50MiB·본문/태그 길이·형식 검증을 거치며 손상/악성 입력은 저장 전에 거부합니다. 현재 작업은 확인 후 텍스트 백업하고 불러옵니다. 원본 사진은 복원하지 않습니다. JSON 스타일은 글 metadata이며 계정의 선택 스타일/등급을 자동 변경하지 않습니다.
-- 신규 IndexedDB 쓰기는 사진을 제외합니다. 기존 원본 localStorage/과거 IndexedDB 사진은 임의 삭제하지 않습니다. 앱 읽기/백업 경로에서는 사진을 반환하지 않습니다. 직접 원본 보관/삭제는 별도 migration 안내를 따릅니다.
+- 신규 IndexedDB 쓰기는 사진을 제외합니다. IndexedDB v2의 textPosts/textDrafts만 새로 쓰고, v1 posts/drafts 및 원본 localStorage/과거 사진은 덮어쓰거나 삭제하지 않습니다. 읽기 호환 마이그레이션은 텍스트만 새 저장소로 복사합니다. 앱 읽기/백업 경로에서는 사진을 반환하지 않습니다. 직접 원본 보관/삭제는 별도 migration 안내를 따릅니다.
 - 스타일: users/{uid}/styles/{id}, activeStyleId. FREE 1개 수정 가능, PRO 여러 개 추가/선택/삭제 가능. 기존 blogStyle은 default로 읽고 다중 저장 시 보존합니다. generation은 서버의 선택 스타일을 읽으며 request.style 및 JSON으로 우회하지 않습니다. 잰잇 preset을 유지합니다.
 
 ## 보안/비용/회원 탈퇴

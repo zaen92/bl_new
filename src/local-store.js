@@ -2,10 +2,10 @@ import {textDocument} from './text-document.js';
 import {approveJSONExport} from './api.js';
 import {auth} from './firebase.js';
 const database = new Promise((resolve, reject) => {
-  const req = indexedDB.open('jaeinit-studio', 1);
+  const req = indexedDB.open('jaeinit-studio', 2);
   req.onupgradeneeded = () => {
-    req.result.createObjectStore('posts', {keyPath:'id'});
-    req.result.createObjectStore('drafts');
+    for(const name of ['posts','textPosts'])if(!req.result.objectStoreNames.contains(name))req.result.createObjectStore(name,{keyPath:'id'});
+    for(const name of ['drafts','textDrafts'])if(!req.result.objectStoreNames.contains(name))req.result.createObjectStore(name);
   };
   req.onsuccess = () => resolve(req.result);
   req.onerror = () => reject(req.error);
@@ -13,6 +13,7 @@ const database = new Promise((resolve, reject) => {
 async function transact(store, mode, operation) {
   const db = await database;
   return new Promise((resolve, reject) => {
+    store=store==='posts'?'textPosts':store==='drafts'?'textDrafts':store;
     const tx = db.transaction(store, mode);
     const request = operation(tx.objectStore(store));
     tx.oncomplete = () => resolve(request?.result);
@@ -25,7 +26,18 @@ export const putLocalPost = p => transact('posts','readwrite', s => s.put({...te
 export const deleteLocalPost = id => transact('posts','readwrite', s => s.delete(id));
 export const getDraft = async() => {const p=await transact('drafts','readonly', s => s.get('current'));return p?textDocument(p):null;};
 export const putDraft = draft => transact('drafts','readwrite', s => s.put(textDocument(draft), 'current'));
+async function migrateDeviceText(){
+ if(await transact('drafts','readonly',s=>s.get('deviceTextMigrated')))return;
+ const db=await database;
+ const raw=(store,operation)=>new Promise((resolve,reject)=>{const tx=db.transaction(store,'readonly'),r=operation(tx.objectStore(store));r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});
+ const oldPosts=await raw('posts',s=>s.getAll()),oldDraft=await raw('drafts',s=>s.get('current'));
+ const cleaned=oldPosts.map(p=>({...textDocument(p),id:p.id,cloudLinks:p.cloudLinks||{}})),draft=oldDraft?textDocument(oldDraft):null;
+ const existing=new Set((await localPosts()).map(p=>p.id)),current=await getDraft();
+ await new Promise((resolve,reject)=>{const tx=db.transaction(['textPosts','textDrafts'],'readwrite');for(const p of cleaned)if(!existing.has(p.id))tx.objectStore('textPosts').put(p);if(draft&&!current)tx.objectStore('textDrafts').put(draft,'current');tx.objectStore('textDrafts').put(true,'deviceTextMigrated');tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error);});
+ // The v1 stores, including original images, are never rewritten or deleted.
+}
 export async function migrateLegacy() {
+  await migrateDeviceText();
   // Never delete or rewrite the original. Invalid JSON remains available in backup.
   const raw = localStorage.getItem('jaeinit_saved_posts');
   if (!raw) return;
@@ -64,6 +76,6 @@ export async function importBackup(raw) {
  const cleaned=entries.map(textDocument);
  const digest=[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(raw)))].map(b=>b.toString(16).padStart(2,'0')).join('');
  const db=await database;
- await new Promise((resolve,reject)=>{const tx=db.transaction('posts','readwrite'),store=tx.objectStore('posts');cleaned.forEach((p,i)=>store.put({...p,id:'import_'+digest+'_'+i,cloudLinks:{}}));tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error);});
+ await new Promise((resolve,reject)=>{const tx=db.transaction('textPosts','readwrite'),store=tx.objectStore('textPosts');cleaned.forEach((p,i)=>store.put({...p,id:'import_'+digest+'_'+i,cloudLinks:{}}));tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error);});
  return entries.length;
 }

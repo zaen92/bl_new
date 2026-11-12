@@ -15,11 +15,13 @@ async function seed(page){
 test('legacy migration, original result panels, safe preview, transient photos, text draft and local save survive reload',async({page})=>{
  const errors=[];page.on('pageerror',e=>errors.push(e.message));
  page.on('dialog',d=>d.accept());
+ await page.route('**/legacy-seed',r=>r.fulfill({contentType:'text/html',body:'<html>legacy fixture</html>'}));await page.goto('/legacy-seed');
+ await page.evaluate(({result,photo})=>new Promise((resolve,reject)=>{const r=indexedDB.open('jaeinit-studio',1);r.onupgradeneeded=()=>{r.result.createObjectStore('posts',{keyPath:'id'});r.result.createObjectStore('drafts');};r.onsuccess=()=>{const tx=r.result.transaction('posts','readwrite');tx.objectStore('posts').put({id:'device-original',title:'기기 원본',data:result,imgs:[photo]});tx.oncomplete=()=>{r.result.close();resolve();};tx.onerror=()=>reject(tx.error);};}),{result,photo});
  await seed(page);await page.goto('/');
- await expect(page.locator('#savedCount')).toHaveText('1');
+ await expect(page.locator('#savedCount')).toHaveText('2');
  expect(await page.evaluate(()=>localStorage.getItem('jaeinit_claude_key'))).toBeNull();
  expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('jaeinit_saved_posts')).length)).toBe(1);
- await page.locator('#tabSaved').click();await page.getByRole('button',{name:'📄 불러오기',exact:true}).click();
+ await page.locator('#tabSaved').click();await page.getByRole('button',{name:'📄 불러오기',exact:true}).first().click();
  await expect(page.locator('#btxt')).toContainText('원래 본문');
  await expect(page.locator('#placeInfo')).toContainText('서울시');
  await expect(page.locator('#tcs .tc')).toHaveCount(3);
@@ -35,7 +37,8 @@ test('legacy migration, original result panels, safe preview, transient photos, 
  await page.locator('#saveBtn').click();await expect(page.locator('#saveBtn')).toHaveText('✅ 기기에 저장됨');
  await page.locator('#tabSaved').click();await expect(page.locator('#savedList')).toContainText('기존 v3 글');
  await page.locator('#backupBtn').click();await expect(page.locator('#eb')).toContainText('로그인');
- const draft=await page.evaluate(()=>new Promise(r=>{const q=indexedDB.open('jaeinit-studio');q.onsuccess=()=>{const tx=q.result.transaction('drafts');const req=tx.objectStore('drafts').get('current');req.onsuccess=()=>r(req.result);};}));
+ const draft=await page.evaluate(()=>new Promise(r=>{const q=indexedDB.open('jaeinit-studio');q.onsuccess=()=>{const tx=q.result.transaction('textDrafts');const req=tx.objectStore('textDrafts').get('current');req.onsuccess=()=>r(req.result);};}));
+ const original=await page.evaluate(()=>new Promise(r=>{const q=indexedDB.open('jaeinit-studio');q.onsuccess=()=>{const req=q.result.transaction('posts').objectStore('posts').get('device-original');req.onsuccess=()=>r(req.result);};}));expect(original.imgs).toEqual([photo]);
  expect(draft.imgs).toEqual([]);expect(draft.form.ci).toBe('기존 내용이 유실되지 않음');
  await page.screenshot({path:'test-results/studio.png',fullPage:true});
  expect(errors).toEqual([]);
@@ -50,7 +53,7 @@ test('stored external HTML is escaped; deletion does not reimport preserved lega
  page.on('dialog',d=>d.accept());
  await page.addInitScript(()=>localStorage.setItem('jaeinit_saved_posts',JSON.stringify([{id:1,title:'공격 문자열',data:{body:'<img src=x onerror=alert(1)>',title_1:'<script>bad</script>',place_name:'<img src=x onerror=alert(1)>',hashtags:['#<img/src=x/onerror=alert(1)>']}}])));
  await page.goto('/');await expect(page.locator('#savedCount')).toHaveText('1');await page.locator('#tabSaved').click();
- await page.getByRole('button',{name:'📄 불러오기',exact:true}).click();
+ await page.getByRole('button',{name:'📄 불러오기',exact:true}).first().click();
  await expect(page.locator('#placeInfo img')).toHaveCount(0);
  await page.locator('#tabPreview').click();await expect(page.locator('#previewArea img')).toHaveCount(0);
  await page.locator('#tabSaved').click();
@@ -68,7 +71,7 @@ test('JSON import preserves active draft, restores text/photo placement without 
  await page.locator('#backupFile').setInputFiles(file);await expect(page.locator('#savedCount')).toHaveText('1');
  await page.locator('#backupFile').setInputFiles(file);await expect(page.locator('#savedCount')).toHaveText('1');
  await expect(page.locator('#ti')).toHaveValue('작성 중 제목');
- await page.getByRole('button',{name:'📄 불러오기',exact:true}).click();
+ await page.getByRole('button',{name:'📄 불러오기',exact:true}).first().click();
  await expect(page.locator('#ci')).toHaveValue('복원한 원문');await expect(page.locator('#pg img')).toHaveCount(0);
  await expect(page.locator('#btxt')).toContainText('[사진1]');
 });

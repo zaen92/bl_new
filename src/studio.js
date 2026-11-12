@@ -8,7 +8,7 @@ var sT='',sV='',imgs=[],resultData=null;
 let draftReady=false;
 let cloudPosts=[];
 let accountEpoch=0;
-let currentGeneration=null,currentStyle=null;
+let currentStyle=null;
 let generationUI;
 const updateStyleProfile=initBlogStyle();
 function escapeHtml(value){return String(value).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
@@ -225,21 +225,20 @@ function clearStudio(){
   ['ti','mi','ci','ii'].forEach(function(id){g(id).value='';});g('pg').innerHTML='';g('pcnt').textContent='';g('cnote').className='cn';
   document.querySelectorAll('.tb').forEach(function(b){b.classList.remove('on');});
   document.querySelectorAll('.vb').forEach(function(b){b.classList.remove('on');});
-  sT='';sV='';imgs=[];resultData=null;currentGeneration=null;currentStyle=null;
+  sT='';sV='';imgs=[];resultData=null;currentStyle=null;
   ['rb1','rb2','rb3','rb4','rb5','rb6'].forEach(function(id){g(id).className='rb';});
   g('load').className='load';g('eb').className='err';g('gb').disabled=false;g('empty').style.display='';
   g('rightResult').scrollTop=0;switchTab('result');queueDraft();
 }
 
 function snapshot(){
-  return {schemaVersion:2, generationId:currentGeneration?.id||null,ownerUid:currentGeneration?.uid||null,generationPhotoDigest:currentGeneration?.photoDigest||null,form:Object.fromEntries(['ti','mi','ci','ii'].map(id=>[id,g(id).value])),
+  return {schemaVersion:3,form:Object.fromEntries(['ti','mi','ci','ii'].map(id=>[id,g(id).value])),
     style:currentStyle,type:sT, volume:sV, imgs:[...imgs], data:resultData, updatedAt:new Date().toISOString()};
 }
 async function persistDraft(){if(draftReady)await putDraft(snapshot());}
 function queueDraft(){if(draftReady)void persistDraft().catch(e=>setError('기기 자동 저장 실패: '+e.message+' · JSON 백업을 확인하세요.'));}
 function applySnapshot(post){
   currentStyle=post.style||null;
-  currentGeneration=post.generationId?{id:post.generationId,uid:post.ownerUid,style:post.style,photoDigest:post.generationPhotoDigest}:null;
   const state=post.form || {};
   for(const id of ['ti','mi','ci','ii'])g(id).value=state[id] || '';
   sT=post.type || '';sV=post.volume || '';imgs=(post.imgs || []).filter(src=>safeImage(src));resultData=post.data || null;
@@ -339,9 +338,7 @@ generationUI=initGenerationUI({onError:setError,onResult:async full=>{
   await photoQueue;
   if(auth.currentUser?.uid!==full.uid)return;
   if(resultData||imgs.length||['ti','mi','ci','ii'].some(id=>g(id).value))await putLocalPost({...snapshot(),id:crypto.randomUUID(),title:'생성 전 작성 내용 자동 백업',date:new Date().toLocaleString('ko-KR')});
-  const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(full.imgs)));
-  const generationPhotoDigest=[...new Uint8Array(digest)].map(b=>b.toString(16).padStart(2,'0')).join('');
-  applySnapshot({form:{ti:full.input.title,mi:full.input.memo,ci:full.input.content,ii:full.input.placeInfo},type:full.input.type,volume:full.input.volume,imgs:full.imgs,style:full.style,data:full.result,generationId:full.id,ownerUid:full.uid,generationPhotoDigest});
+  applySnapshot({form:{ti:full.input.title,mi:full.input.memo,ci:full.input.content,ii:full.input.placeInfo},type:full.input.type,volume:full.input.volume,imgs:full.imgs,style:full.style,data:full.result});
   await persistDraft();
   await putLocalPost({...snapshot(),id:'generation_'+full.id,title:full.result.title_1,date:new Date().toLocaleString('ko-KR')});
   await updateSavedCount();switchTab('result');

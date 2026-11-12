@@ -1,6 +1,6 @@
 # 최종 정책 데이터 마이그레이션/보관 절차
 
-이번 커밋은 코드 변경이며 운영 데이터 삭제·이동·배포를 실행하지 않았습니다. 구 Storage bucket, photoGroups, photoChunks, 기기 원본은 그대로 둡니다. 새 앱은 이미지 원문을 쓰거나 읽지 않고 텍스트/배치만 사용합니다.
+이번 커밋은 코드 변경이며 운영 데이터 삭제·이동·배포를 실행하지 않았습니다. 구 Storage bucket, photoGroups, photoChunks, 기기 원본은 그대로 둡니다. IndexedDB v2는 textPosts/textDrafts를 사용하고 v1 posts/drafts에는 새 쓰기·삭제를 하지 않습니다. 새 앱은 이미지 원문을 쓰거나 읽지 않고 텍스트/배치만 사용합니다.
 
 ## 배포 전 운영자 검토
 
