@@ -8,7 +8,7 @@ before(async()=>{
  await env.withSecurityRulesDisabled(async ctx=>{
   const db=ctx.firestore();
   for(const uid of ['alice','bob']){
-   await setDoc(doc(db,'users',uid),{uid,credits:2});
+   await setDoc(doc(db,'users',uid),{uid,credits:5});
    for(const name of ['creditLedger','orders','generations','posts'])await setDoc(doc(db,name,uid),{uid,body:'private'});
    await setDoc(doc(db,`posts/${uid}/photoChunks/0`),{value:'private-image'});
   }
@@ -33,7 +33,7 @@ test('owners can read own records but not other users; queries must constrain ui
   await assertFails(getDocs(collection(db,name)));
   await assertFails(getDocs(query(collection(db,name),where('uid','==','bob'))));
  }
- await assertSucceeds(getDoc(doc(db,'posts/alice/photoChunks/0')));
+ await assertFails(getDoc(doc(db,'posts/alice/photoChunks/0')));
  await assertFails(getDoc(doc(db,'posts/bob/photoChunks/0')));
 });
 test('clients cannot create, update, delete credits or forge owners, including admin credit edits',async()=>{

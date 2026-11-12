@@ -1,7 +1,7 @@
 import { auth, emulatorMode } from './firebase.js';
 import { GoogleAuthProvider, signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword,
   sendEmailVerification, sendPasswordResetEmail, signOut, onAuthStateChanged, reload } from 'firebase/auth';
-import { ensureProfile, watchMember } from './api.js';
+import { ensureProfile, watchMember,servicePolicy } from './api.js';
 const el = id => document.getElementById(id);
 export function initAccount({onPosts, onSession,onProfile=()=>{}}) {
   let stop = () => {}, epoch = 0;
@@ -29,10 +29,11 @@ export function initAccount({onPosts, onSession,onProfile=()=>{}}) {
     try {
       await ensureProfile();
       if(current!==epoch || auth.currentUser?.uid!==user.uid)return;
+      const policy=await servicePolicy();
       stop=watchMember(user.uid, profile=>{
         if(current!==epoch)return;
         el('dot').className='hd-dot on';
-        el('stxStatus').textContent=`크레딧 ${profile?.credits ?? 0}개`;onProfile(profile);
+        el('stxStatus').textContent=`크레딧 ${profile?.credits ?? 0}개`;onProfile(profile,policy);
         message(`로그인되었습니다. 크레딧 ${profile?.credits ?? 0}개 · 새 AI 생성 1회당 1크레딧입니다.`);
       }, posts=>{if(current===epoch)onPosts(posts);}, error=>message(error.message));
     }catch(error){if(current===epoch){message(error.message);el('stxStatus').textContent='회원 초기화 재시도 필요';}}

@@ -22,7 +22,7 @@ env:
 
 jobs:
   step2:
-    name: AI credits, Storage, regression and browser E2E
+    name: AI credits, policies, regression and browser E2E
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     defaults:
@@ -71,20 +71,19 @@ jobs:
         if: ${{ !cancelled() && steps.deps.outcome == 'success' }}
         run: node scripts/ci-run.mjs ci-tools node --test --test-reporter=tap tests/ci/ci-report.test.mjs
 
-      - name: Restore official Firestore/Storage artifacts cache
+      - name: Restore official Firestore artifacts cache
         id: emulator-cache
         if: ${{ !cancelled() && steps.deps.outcome == 'success' }}
         uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
           path: |
             ${{ env.FIREBASE_EMULATORS_PATH }}/cloud-firestore-emulator-*.jar
-            ${{ env.FIREBASE_EMULATORS_PATH }}/cloud-storage-rules-*.jar
-          key: ${{ runner.os }}-step2-emulators-${{ hashFiles('package-lock.json') }}
+          key: ${{ runner.os }}-step2-policy-emulators-${{ hashFiles('package-lock.json') }}
 
-      - name: Prepare and verify the official Firestore/Storage Emulators
+      - name: Prepare and verify the official Firestore Emulators
         id: prepare
         if: ${{ !cancelled() && steps.deps.outcome == 'success' }}
-        run: node scripts/ci-run.mjs prepare npm run emulators:prepare -- --storage
+        run: node scripts/ci-run.mjs prepare npm run emulators:prepare
 
       - name: Save only the verified official artifact
         if: ${{ !cancelled() && steps.prepare.outcome == 'success' && steps.emulator-cache.outputs.cache-hit != 'true' }}
@@ -92,8 +91,7 @@ jobs:
         with:
           path: |
             ${{ env.FIREBASE_EMULATORS_PATH }}/cloud-firestore-emulator-*.jar
-            ${{ env.FIREBASE_EMULATORS_PATH }}/cloud-storage-rules-*.jar
-          key: ${{ runner.os }}-step2-emulators-${{ hashFiles('package-lock.json') }}
+          key: ${{ runner.os }}-step2-policy-emulators-${{ hashFiles('package-lock.json') }}
 
       - name: Create an ephemeral Emulator-only HMAC key
         id: test-key
@@ -107,8 +105,8 @@ jobs:
           NODE
 
       # Prioritize the previously unrun 4 security + 7 server tests.
-      # npm test runs 47 real Emulator/unit cases; required regressions remain enabled.
-      - name: STEP 1 regression plus STEP 2 credits/photos integration
+      # npm test runs 58 real Emulator/unit cases; required regressions remain enabled.
+      - name: STEP 1 regression plus STEP 2 credits/policies integration
         id: integration
         if: ${{ !cancelled() && steps.prepare.outcome == 'success' && steps.test-key.outcome == 'success' }}
         run: node scripts/ci-run.mjs step2-integration timeout --signal=TERM --kill-after=20s 6m npm test

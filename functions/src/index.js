@@ -1,13 +1,15 @@
 import { initializeApp, getAuth, getFirestore } from './admin.js';
 import { defineSecret,defineString } from 'firebase-functions/params';
-import {onDocumentCreated} from 'firebase-functions/v2/firestore';
 import {onSchedule} from 'firebase-functions/v2/scheduler';
 import * as functionsV1 from 'firebase-functions/v1';
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { provisionProfile } from './profile.js';
-import { saveOwnedPost,saveStoragePost,loadOwnedPost } from './posts.js';
+import { saveOwnedPost,loadOwnedPost,deleteOwnedPost,listOwnedPosts } from './posts.js';
 import {reserveGeneration,runGeneration,recoverExpired,saveBlogStyle,validateInput} from './generations.js';
-import {uploadPhotos,loadPhotos,photoBucket,cleanupPhotos,deleteUserPhotos} from './photos.js';
+import {decodePhotos} from './photos.js';
+import {configFrom} from './ai-config.js';
+import {approveExport,listStyles,selectStyle,deleteStyle} from './member-features.js';
+import {policyFrom,validatePolicy} from './service-policy.js';
 import {anthropicProvider,mockProvider} from './ai-provider.js';
 import {validateAIConfig} from './ai-config.js';
 import {appCheckEnabled} from './runtime-config.js';
@@ -44,29 +46,25 @@ export const ensureProfile = onCall({...options, secrets: [identityKey]}, async 
 export const savePost = onCall(options, async request => {
   const user = await member(request);
   const data=request.data;
-  return data?.photoGroupId||data?.generationId||!data?.post?.imgs?.length?saveStoragePost(db,user.uid,data):saveOwnedPost(db,user.uid,data);
+  return saveOwnedPost(db,user.uid,data);
 });
 export const getPost = onCall(options, async request => {
   const user = await member(request);
   const post=await loadOwnedPost(db,user.uid,request.data?.id);
-  if(post.photoGroupId)post.imgs=(await loadPhotos(db,photoBucket(),user.uid,post.photoGroupId)).map(p=>`data:${p.mime};base64,${p.buffer.toString('base64')}`);
   return post;
 });
-export const requestGeneration = onCall(options, async (request,response) => {
+export const requestGeneration = onCall({...options,timeoutSeconds:360,memory:'1GiB',secrets:[claudeKey,naverId,naverSecret]}, async (request,response) => {
   const user=await member(request);
   // validate/reserve before selecting a provider; disabled modes never enqueue.
   validateInput(request.data);
   const mode=providerMode.value();
   if(!['anthropic','mock'].includes(mode)||mode==='mock'&&process.env.FUNCTIONS_EMULATOR!=='true')throw new HttpsError('failed-precondition','AI 서비스가 아직 설정되지 않았습니다.');
+  const provider=getProvider();
+  const {photos}=decodePhotos(request.data.photos||[],configFrom(await db.doc('ops/ai').get()));
   const accepted=await reserveGeneration(db,user.uid,request.data);
   if(request.acceptsStreaming)await response.sendChunk({phase:'accepted',...accepted});
+  if(!accepted.duplicate)await runGeneration(db,accepted.generationId,{provider,photos});
   return accepted;
-});
-export const generationWorker=onDocumentCreated({document:'generationJobs/{id}',region:'asia-northeast3',timeoutSeconds:360,memory:'1GiB',maxInstances:10,retry:false,secrets:[claudeKey,naverId,naverSecret]},async event=>{
-  await runGeneration(db,event.params.id,{provider:getProvider(),loadPhotos:(uid,id)=>loadPhotos(db,photoBucket(),uid,id)});
-});
-export const uploadGenerationPhotos=onCall({...options,timeoutSeconds:120,memory:'512MiB'},async request=>{
- const user=await member(request);return uploadPhotos(db,photoBucket(),user.uid,request.data||{});
 });
 export const getGeneration=onCall(options,async request=>{
  const user=await member(request),id=request.data?.generationId;
@@ -74,9 +72,8 @@ export const getGeneration=onCall(options,async request=>{
  const g=await db.doc(`generations/${id}`).get();
  if(!g.exists||g.data().uid!==user.uid)throw new HttpsError('permission-denied','본인의 생성 결과만 조회할 수 있습니다.');
  const value={...g.data(),id};
- const photoState=value.photoGroupId?await db.doc(`photoGroups/${value.photoGroupId}`).get():null;
- value.photosExpired=!!photoState&&photoState.data()?.status==='deleted';
- value.imgs=value.photoGroupId&&!value.photosExpired?(await loadPhotos(db,photoBucket(),user.uid,value.photoGroupId)).map(p=>`data:${p.mime};base64,${p.buffer.toString('base64')}`):[];
+ value.imgs=[];value.photosRequireAttachment=true;
+ delete value.photoGroupId;
  return value;
 });
 export const updateBlogStyle=onCall(options,async request=>{
@@ -89,12 +86,19 @@ export const updateAIConfig=onCall(options,async request=>{
  await operator(request);const c=validateAIConfig(request.data);await db.doc('ops/ai').set(c);return {updated:true};
 });
 export const recoverGenerations=onCall(options,async request=>{await operator(request);return recoverExpired(db);});
-export const recoverySchedule=onSchedule({schedule:'every 5 minutes',region:'asia-northeast3',timeoutSeconds:300},async()=>{await recoverExpired(db);await cleanupPhotos(db,photoBucket());});
-export const deletedPhotoSchedule=onSchedule({schedule:'every 24 hours',region:'asia-northeast3',timeoutSeconds:540},async()=>{
- const deleted=await db.collection('deletedUsers').orderBy('lastSweptAt').limit(100).get();
- for(const user of deleted.docs)await deleteUserPhotos(db,photoBucket(),user.id);
+export const recoverySchedule=onSchedule({schedule:'every 5 minutes',region:'asia-northeast3',timeoutSeconds:300},async()=>{await recoverExpired(db);});
+export const accountDeleted=functionsV1.region('asia-northeast3').auth.user().onDelete(async user=>{
+ await db.doc(`deletedUsers/${user.uid}`).set({deletedAt:new Date()},{merge:true});
+ // Existing photos are preserved for separately approved legacy migration/cleanup.
 });
-export const accountDeleted=functionsV1.region('asia-northeast3').auth.user().onDelete(async user=>{await deleteUserPhotos(db,photoBucket(),user.uid);});
+export const deletePost=onCall(options,async r=>deleteOwnedPost(db,(await member(r)).uid,r.data||{}));
+export const listPosts=onCall(options,async r=>listOwnedPosts(db,(await member(r)).uid,r.data||{}));
+export const approveJSONExport=onCall(options,async r=>approveExport(db,(await member(r)).uid,r.data||{}));
+export const getServicePolicy=onCall(options,async r=>{await member(r);return policyFrom(await db.doc('ops/service').get());});
+export const updateServicePolicy=onCall(options,async r=>{await operator(r);await db.doc('ops/service').set(validatePolicy(r.data));return {updated:true};});
+export const getBlogStyles=onCall(options,async r=>listStyles(db,(await member(r)).uid));
+export const selectBlogStyle=onCall(options,async r=>selectStyle(db,(await member(r)).uid,r.data||{}));
+export const deleteBlogStyle=onCall(options,async r=>deleteStyle(db,(await member(r)).uid,r.data||{}));
 // Payment interfaces remain closed for STEP 3.
 export const createOrder = onCall(options, async request => {
   await member(request);

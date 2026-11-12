@@ -1,3 +1,6 @@
+import {textDocument} from './text-document.js';
+import {approveJSONExport} from './api.js';
+import {auth} from './firebase.js';
 const database = new Promise((resolve, reject) => {
   const req = indexedDB.open('jaeinit-studio', 1);
   req.onupgradeneeded = () => {
@@ -17,11 +20,11 @@ async function transact(store, mode, operation) {
     tx.onabort = () => reject(tx.error || new Error('기기 저장에 실패했습니다.'));
   });
 }
-export const localPosts = () => transact('posts','readonly', s => s.getAll());
-export const putLocalPost = p => transact('posts','readwrite', s => s.put(p));
+export const localPosts = async() => (await transact('posts','readonly', s => s.getAll())).map(p=>({...textDocument(p),id:p.id,cloudLinks:p.cloudLinks||{}}));
+export const putLocalPost = p => transact('posts','readwrite', s => s.put({...textDocument(p),id:p.id,cloudLinks:p.cloudLinks||{}}));
 export const deleteLocalPost = id => transact('posts','readwrite', s => s.delete(id));
-export const getDraft = () => transact('drafts','readonly', s => s.get('current'));
-export const putDraft = draft => transact('drafts','readwrite', s => s.put(draft, 'current'));
+export const getDraft = async() => {const p=await transact('drafts','readonly', s => s.get('current'));return p?textDocument(p):null;};
+export const putDraft = draft => transact('drafts','readwrite', s => s.put(textDocument(draft), 'current'));
 export async function migrateLegacy() {
   // Never delete or rewrite the original. Invalid JSON remains available in backup.
   const raw = localStorage.getItem('jaeinit_saved_posts');
@@ -39,32 +42,28 @@ export async function migrateLegacy() {
   await transact('drafts','readwrite', s=>s.put(digest,'migratedLegacy'));
 }
 export async function exportBackup() {
-  const backup = {schemaVersion:1, exportedAt:new Date().toISOString(), posts:await localPosts(),
-    draft:await getDraft(), legacyRaw:localStorage.getItem('jaeinit_saved_posts')};
-  const url = URL.createObjectURL(new Blob([JSON.stringify(backup)], {type:'application/json'}));
-  const a = document.createElement('a'); a.href=url; a.download='jaeinit-backup.json'; a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+ if(!auth.currentUser)throw new Error('로그인 후 JSON 내보내기를 이용하세요.');
+ const backup={schemaVersion:3,posts:(await localPosts()).map(textDocument),draft:(await getDraft())};
+ const json=JSON.stringify(backup);if(json.length>50*1024*1024)throw new Error('JSON 파일이 너무 큽니다.');
+ // Validate the complete, image-free file before asking the server for approval.
+ JSON.parse(json);const blob=new Blob([json],{type:'application/json'});
+ const digest=[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(json)))].map(b=>b.toString(16).padStart(2,'0')).join('');
+ const key='jaeinit_export_pending_'+auth.currentUser.uid;
+ let pending;try{pending=JSON.parse(localStorage.getItem(key)||'null');}catch{}
+ if(!pending||pending.digest!==digest||pending.bytes!==blob.size){pending={requestId:crypto.randomUUID(),digest,bytes:blob.size};localStorage.setItem(key,JSON.stringify(pending));}
+ await approveJSONExport(pending);
+ const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='jaeinit-backup.json';
+ try{a.click();localStorage.removeItem(key);}finally{setTimeout(()=>URL.revokeObjectURL(url),1000);}
 }
-
 export async function importBackup(raw) {
-  if(raw.length>50*1024*1024)throw new Error('백업 파일은 최대 50MiB입니다. 원본은 변경되지 않았습니다.');
-  const parsed=JSON.parse(raw);
-  const posts=Array.isArray(parsed)?parsed:parsed.posts;
-  if(!Array.isArray(posts))throw new Error('posts 배열이 포함된 JSON 백업을 선택하세요.');
-  const entries=[...posts];
-  if(parsed.draft)entries.push({...parsed.draft,title:'백업에서 복원한 작성 중 글'});
-  for(const p of entries){
-    if(!p || typeof p!=='object' || (p.data && (typeof p.data!=='object' || typeof p.data.body!=='string')) ||
-      (p.imgs && (!Array.isArray(p.imgs) || p.imgs.some(src=>typeof src!=='string' || !/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/]+=*$/.test(src)))))
-      throw new Error('지원하지 않는 글/사진 데이터입니다. 파일과 기존 보관함은 유지됩니다.');
-  }
-  const digest=[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(raw)))].map(b=>b.toString(16).padStart(2,'0')).join('');
-  // All records in one transaction: a failed import never leaves a partial backup.
-  const db=await database;
-  await new Promise((resolve,reject)=>{
-    const tx=db.transaction('posts','readwrite');const store=tx.objectStore('posts');
-    entries.forEach((p,index)=>store.put({...p,id:'import_'+digest+'_'+index,cloudLinks:{}}));
-    tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error);
-  });
-  return entries.length;
+ if(raw.length>50*1024*1024)throw new Error('백업 파일은 최대 50MiB입니다.');
+ const parsed=JSON.parse(raw),posts=Array.isArray(parsed)?parsed:parsed?.posts;
+ if(!Array.isArray(posts)||posts.length>10000)throw new Error('posts 배열이 포함된 JSON을 선택하세요.');
+ const entries=[...posts];if(parsed.draft)entries.push({...parsed.draft,title:'백업에서 복원한 작성 중 글'});
+ // Images and every unknown field in legacy JSON are ignored, never restored.
+ const cleaned=entries.map(textDocument);
+ const digest=[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(raw)))].map(b=>b.toString(16).padStart(2,'0')).join('');
+ const db=await database;
+ await new Promise((resolve,reject)=>{const tx=db.transaction('posts','readwrite'),store=tx.objectStore('posts');cleaned.forEach((p,i)=>store.put({...p,id:'import_'+digest+'_'+i,cloudLinks:{}}));tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error);});
+ return entries.length;
 }

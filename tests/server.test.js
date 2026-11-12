@@ -9,23 +9,23 @@ const db=getFirestore(app),auth=getAuth(app);
 after(async()=>{await db.terminate();await deleteApp(app);});
 const key='emulator-test-only-signup-hmac-key-000000000000';
 const identity=uid=>({uid,email:`${uid}@example.test`,emailVerified:true,displayName:'테스트'});
-const post={title:'서울 카페',type:'카페',volume:'normal',date:'오늘',data:{title_1:'서울 카페',body:'사진 포함 본문 [사진1]',hashtags:['#서울']},form:{ti:'제목',mi:'메모',ci:'직접 쓴 내용',ii:'주소'},imgs:['data:image/png;base64,'+'YQ=='.repeat(1)]};
-test('concurrent/repeated initializations grant exactly 2 once and one ledger entry',async()=>{
+const post={title:'서울 카페',type:'카페',volume:'normal',date:'오늘',data:{title_1:'서울 카페',body:'사진 포함 본문 [사진1]',hashtags:['#서울']},form:{ti:'제목',mi:'메모',ci:'직접 쓴 내용',ii:'주소'},imgs:[]};
+test('concurrent/repeated initializations grant exactly 5 once and one ledger entry',async()=>{
  const user=identity('concurrent');
  const results=await Promise.all(Array.from({length:24},()=>provisionProfile(db,user,key)));
  assert.equal(results.filter(r=>r.created).length,1);
- assert.equal((await db.doc('users/concurrent').get()).data().credits,2);
+ assert.equal((await db.doc('users/concurrent').get()).data().credits,5);
  const ledger=await db.collection('creditLedger').where('uid','==',user.uid).get();
- assert.equal(ledger.size,1);assert.equal(ledger.docs[0].data().delta,2);
+ assert.equal(ledger.size,1);assert.equal(ledger.docs[0].data().delta,5);
  assert.ok(ledger.docs[0].data().createdAt instanceof Timestamp);
  assert.ok((await db.doc(`users/${user.uid ?? user.localId}`).get()).data().createdAt instanceof Timestamp);
- assert.equal(ledger.docs[0].data().balanceAfter,2);
+ assert.equal(ledger.docs[0].data().balanceAfter,5);
  const profile=(await db.doc('users/concurrent').get()).data();
  const claim=(await db.doc(`signupClaims/${signupIdentity(user.email,key)}`).get()).data();
  assert.ok(profile.createdAt.isEqual(ledger.docs[0].data().createdAt));
  assert.ok(profile.createdAt.isEqual(claim.createdAt));
  await provisionProfile(db,user,key);
- assert.equal((await db.doc('users/concurrent').get()).data().credits,2);
+ assert.equal((await db.doc('users/concurrent').get()).data().credits,5);
 });
 test('deletion/re-registration with same verified email, case/space variants cannot mint credits',async()=>{
  await provisionProfile(db,identity('original'),key);
@@ -37,17 +37,18 @@ test('deletion/re-registration with same verified email, case/space variants can
  assert.equal((await db.doc('users/rejoined').get()).data().credits,0);
  assert.equal((await db.collection('creditLedger').where('uid','==','rejoined').get()).size,0);
 });
-test('24 distinct UIDs concurrently sharing verified email receive 2 credits total',async()=>{
+test('24 distinct UIDs concurrently sharing verified email receive 5 credits total',async()=>{
  const users=Array.from({length:24},(_,i)=>`race-${i}`).map(uid=>({...identity(uid),email:'shared@example.test'}));
  const results=await Promise.all(users.map(user=>provisionProfile(db,user,key)));
- assert.equal(results.reduce((sum,r)=>sum+r.credits,0),2);
+ assert.equal(results.reduce((sum,r)=>sum+r.credits,0),5);
 });
 test('unverified and disabled identities cannot get profiles',async()=>{
  await assert.rejects(provisionProfile(db,{...identity('unverified'),emailVerified:false},key));
  await assert.rejects(provisionProfile(db,{...identity('disabled'),disabled:true},key));
  assert.equal((await db.doc('users/unverified').get()).exists,false);
 });
-test('cloud post preserves source, result and chunked photos; idempotency, CAS and ownership enforced',async()=>{
+test('cloud post preserves source, result and photo positions without images; idempotency, CAS and ownership enforced',async()=>{
+ await provisionProfile(db,identity('writer'),key);
  const payload={id:'post-test',requestId:'request-one',expectedVersion:0,post};
  assert.deepEqual(await saveOwnedPost(db,'writer',payload),{id:'post-test',version:1});
  assert.deepEqual(await saveOwnedPost(db,'writer',payload),{id:'post-test',version:1});
@@ -82,17 +83,17 @@ test('actual callable: unauthenticated/unverified rejected; verified provisionin
  await auth.updateUser(user.localId,{emailVerified:true});
  const initial=await Promise.all(Array.from({length:24},()=>callable('ensureProfile',user.idToken,{credits:999})));
  assert.equal(initial.filter(r=>r.result?.created).length,1);
- for(const result of initial)assert.equal(result.result?.credits,2,JSON.stringify(result));
+ for(const result of initial)assert.equal(result.result?.credits,5,JSON.stringify(result));
  const ledger=await db.collection('creditLedger').where('uid','==',user.localId).get();
- assert.equal(ledger.size,1);assert.equal(ledger.docs[0].data().delta,2);
+ assert.equal(ledger.size,1);assert.equal(ledger.docs[0].data().delta,5);
  assert.ok(ledger.docs[0].data().createdAt instanceof Timestamp);
  assert.ok((await db.doc(`users/${user.uid ?? user.localId}`).get()).data().createdAt instanceof Timestamp);
- assert.equal(ledger.docs[0].data().balanceAfter,2);
+ assert.equal(ledger.docs[0].data().balanceAfter,5);
  for(let attempt=0;attempt<3;attempt++){
   const response=await fetch('http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=demo-key',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email,password:'test-password-123',returnSecureToken:true})});
   const login=await response.json();assert.ok(login.idToken);
   const repeated=await callable('ensureProfile',login.idToken);
-  assert.equal(repeated.result.created,false);assert.equal(repeated.result.credits,2);
+  assert.equal(repeated.result.created,false);assert.equal(repeated.result.credits,5);
  }
  assert.equal((await db.collection('creditLedger').where('uid','==',user.localId).get()).size,1);
  assert.equal((await callable('requestGeneration',user.idToken)).error.status,'INVALID_ARGUMENT');
@@ -100,7 +101,7 @@ test('actual callable: unauthenticated/unverified rejected; verified provisionin
  const save=await callable('savePost',user.idToken,{id:'via-callable',requestId:'first',expectedVersion:0,post});
  assert.equal(save.result.version,1);
  assert.deepEqual((await callable('getPost',user.idToken,{id:'via-callable'})).result.imgs,post.imgs);
- assert.equal((await db.doc(`users/${user.localId}`).get()).data().credits,2);
+ assert.equal((await db.doc(`users/${user.localId}`).get()).data().credits,5);
  await auth.deleteUser(user.localId);await db.doc(`users/${user.localId}`).delete();
  const rejoined=await signup(email);await auth.updateUser(rejoined.localId,{emailVerified:true});
  assert.equal((await callable('ensureProfile',rejoined.idToken)).result.credits,0);

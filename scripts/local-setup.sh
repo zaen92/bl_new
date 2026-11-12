@@ -22,4 +22,4 @@ NODE
 npm run build
 
 # Prepare verified official artifacts once; later tests never auto-download.
-npm run emulators:prepare -- --ui --storage
+npm run emulators:prepare -- --ui

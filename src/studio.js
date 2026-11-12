@@ -1,5 +1,5 @@
 import { auth } from './firebase.js';
-import { saveCloudPost, loadCloudPost } from './api.js';
+import { saveCloudPost, loadCloudPost,listCloudPosts,deleteCloudPost } from './api.js';
 import {initGenerationUI} from './generation-ui.js';
 import {initBlogStyle} from './blog-style.js';
 import { initAccount } from './account.js';
@@ -8,12 +8,12 @@ var sT='',sV='',imgs=[],resultData=null;
 let draftReady=false;
 let cloudPosts=[];
 let accountEpoch=0;
-let currentGeneration=null;
+let currentGeneration=null,currentStyle=null;
 let generationUI;
 const updateStyleProfile=initBlogStyle();
 function escapeHtml(value){return String(value).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function safeImage(value){return /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/]+=*$/.test(value)?value:'';}
-function setError(message){g('eb').textContent=message;g('eb').className='err on';}
+function setError(message){if(/FREE 기능 한도/.test(message))g('proModal').className='modal';g('eb').textContent=message;g('eb').className='err on';}
 function openSettings(){g('modal').className='modal';}
 function closeModal(){g('modal').className='modal hide';}
 function g(id){return document.getElementById(id);}
@@ -222,7 +222,7 @@ function clearStudio(){
   ['ti','mi','ci','ii'].forEach(function(id){g(id).value='';});g('pg').innerHTML='';g('pcnt').textContent='';g('cnote').className='cn';
   document.querySelectorAll('.tb').forEach(function(b){b.classList.remove('on');});
   document.querySelectorAll('.vb').forEach(function(b){b.classList.remove('on');});
-  sT='';sV='';imgs=[];resultData=null;currentGeneration=null;
+  sT='';sV='';imgs=[];resultData=null;currentGeneration=null;currentStyle=null;
   ['rb1','rb2','rb3','rb4','rb5','rb6'].forEach(function(id){g(id).className='rb';});
   g('load').className='load';g('eb').className='err';g('gb').disabled=false;g('empty').style.display='';
   g('rightResult').scrollTop=0;switchTab('result');queueDraft();
@@ -230,12 +230,13 @@ function clearStudio(){
 
 function snapshot(){
   return {schemaVersion:2, generationId:currentGeneration?.id||null,ownerUid:currentGeneration?.uid||null,generationPhotoDigest:currentGeneration?.photoDigest||null,form:Object.fromEntries(['ti','mi','ci','ii'].map(id=>[id,g(id).value])),
-    type:sT, volume:sV, imgs:[...imgs], data:resultData, updatedAt:new Date().toISOString()};
+    style:currentStyle,type:sT, volume:sV, imgs:[...imgs], data:resultData, updatedAt:new Date().toISOString()};
 }
 async function persistDraft(){if(draftReady)await putDraft(snapshot());}
 function queueDraft(){if(draftReady)void persistDraft().catch(e=>setError('기기 자동 저장 실패: '+e.message+' · JSON 백업을 확인하세요.'));}
 function applySnapshot(post){
-  currentGeneration=post.generationId?{id:post.generationId,uid:post.ownerUid,photoDigest:post.generationPhotoDigest}:null;
+  currentStyle=post.style||null;
+  currentGeneration=post.generationId?{id:post.generationId,uid:post.ownerUid,style:post.style,photoDigest:post.generationPhotoDigest}:null;
   const state=post.form || {};
   for(const id of ['ti','mi','ci','ii'])g(id).value=state[id] || '';
   sT=post.type || '';sV=post.volume || '';imgs=(post.imgs || []).filter(src=>safeImage(src));resultData=post.data || null;
@@ -279,6 +280,7 @@ function postCard(post,cloud=false){
   const buttons=document.createElement('div');buttons.className='ar';
   buttons.append(action('📄 불러오기',async()=>{
     const epoch=accountEpoch;
+    if(!confirm('현재 작업을 텍스트로 백업하고 글을 불러올까요? 사진은 재첨부해야 합니다.'))return;
     const loaded=cloud?await loadCloudPost(post.id):post;
     if(cloud && epoch!==accountEpoch)throw new Error('계정이 변경되었습니다. 다시 선택하세요.');
     await photoQueue;
@@ -286,6 +288,9 @@ function postCard(post,cloud=false){
     await putLocalPost({...snapshot(),id:crypto.randomUUID(),title:'작성 중 자동 백업',date:new Date().toLocaleString('ko-KR')});
     applySnapshot(loaded);await persistDraft();switchTab('result');await updateSavedCount();
   }),action('📋 복사',()=>cpTxt(`[제목]\n${post.title}\n\n[본문]\n${nl(post.data?.body||'')}\n\n[해시태그]\n${(post.data?.hashtags||[]).join(' ')}`)));
+  if(cloud){
+    buttons.append(action('✏️ 현재 내용으로 계정 글 수정',async()=>{if(!resultData)throw new Error('수정할 결과를 먼저 불러오세요.');await saveCloudPost({id:post.id,expectedVersion:post.version,requestId:crypto.randomUUID(),post:{...snapshot(),title:resultData.title_1||post.title}});} ),action('🗑️ 계정 글 삭제',async()=>{if(confirm('계정의 이 글을 삭제할까요?'))await deleteCloudPost({id:post.id,requestId:crypto.randomUUID()});}));
+  }
   if(!cloud){
     buttons.append(action('☁️ 내 계정에 복사',async()=>{
       const uid=auth.currentUser?.uid;
@@ -320,6 +325,7 @@ g('backupBtn').onclick=()=>exportBackup().catch(e=>setError(e.message));
 g('importBtn').onclick=()=>g('backupFile').click();
 g('backupFile').onchange=async event=>{
   const file=event.target.files[0];if(!file)return;
+  if(!confirm('JSON의 텍스트와 사진 위치만 복원합니다. 실제 사진과 회원 정보는 복원하지 않습니다. 현재 작업은 유지됩니다. 계속할까요?'))return;
   try{const count=await importBackup(await file.text());await renderSavedList();await updateSavedCount();alert(count+'개를 기기 보관함에 복원했습니다. 현재 작성 중 데이터는 유지됩니다.');}
   catch(e){setError('가져오기 실패: '+e.message);}
   finally{event.target.value='';}
@@ -332,7 +338,7 @@ generationUI=initGenerationUI({onError:setError,onResult:async full=>{
   if(resultData||imgs.length||['ti','mi','ci','ii'].some(id=>g(id).value))await putLocalPost({...snapshot(),id:crypto.randomUUID(),title:'생성 전 작성 내용 자동 백업',date:new Date().toLocaleString('ko-KR')});
   const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(full.imgs)));
   const generationPhotoDigest=[...new Uint8Array(digest)].map(b=>b.toString(16).padStart(2,'0')).join('');
-  applySnapshot({form:{ti:full.input.title,mi:full.input.memo,ci:full.input.content,ii:full.input.placeInfo},type:full.input.type,volume:full.input.volume,imgs:full.imgs,data:full.result,generationId:full.id,ownerUid:full.uid,generationPhotoDigest});
+  applySnapshot({form:{ti:full.input.title,mi:full.input.memo,ci:full.input.content,ii:full.input.placeInfo},type:full.input.type,volume:full.input.volume,imgs:full.imgs,style:full.style,data:full.result,generationId:full.id,ownerUid:full.uid,generationPhotoDigest});
   await persistDraft();
   await putLocalPost({...snapshot(),id:'generation_'+full.id,title:full.result.title_1,date:new Date().toLocaleString('ko-KR')});
   await updateSavedCount();switchTab('result');
@@ -343,9 +349,9 @@ g('editBodyBtn').onclick=()=>{
 };
 g('btxt').addEventListener('blur',()=>{if(resultData&&g('btxt').contentEditable==='true'){resultData.body=g('btxt').textContent;queueDraft();}});
 initAccount({
-  onProfile(profile){generationUI.profile(profile);updateStyleProfile(profile);},
+  onProfile(profile,policy){generationUI.profile(profile);updateStyleProfile(profile);g('signupPolicy').textContent=`이메일 인증 후 최초 무료 AI ${policy.signupCredits}회 · 월 추가 지급 없음 · 크레딧 충전 준비 중`;g('memberPolicy').textContent=`${profile?.tier||'FREE'} · 글 ${profile?.savedPostCount||0}/${profile?.tier==='PRO'?'무제한':policy.freePostLimit} · JSON ${profile?.exportsUsed||0}/${profile?.tier==='PRO'?'무제한':policy.freeExportLimit}`;},
   onSession(uid){generationUI.session(uid);accountEpoch++;cloudPosts=[];renderCloudPosts();void updateSavedCount().catch(e=>setError(e.message));},
-  onPosts(posts){cloudPosts=posts;renderCloudPosts();void updateSavedCount().catch(e=>setError(e.message));}
+  onPosts(posts){const first=new Set(posts.map(p=>p.id));cloudPosts=[...posts,...cloudPosts.slice(20).filter(p=>!first.has(p.id))];renderCloudPosts();void updateSavedCount().catch(e=>setError(e.message));}
 });
 async function initializeLocal(){
   try{await migrateLegacy();}catch(e){setError(e.message);}
@@ -363,3 +369,8 @@ async function reset(){
     clearStudio();await persistDraft();await updateSavedCount();
   }catch(e){setError('원본 보관에 실패하여 새로 작성을 취소했습니다: '+e.message);}
 }
+
+g('closeProBtn').onclick=()=>g('proModal').className='modal hide';
+g('morePostsBtn').onclick=async()=>{
+ try{const data=await listCloudPosts({cursor:cloudPosts.at(-1)?.id||null});const existing=new Set(cloudPosts.map(p=>p.id));cloudPosts.push(...data.posts.filter(p=>!existing.has(p.id)));renderCloudPosts();g('morePostsBtn').disabled=!data.nextCursor;}catch(e){setError(e.message);}
+};

@@ -2,25 +2,29 @@ import {createHash,randomUUID} from 'node:crypto';
 import {HttpsError} from 'firebase-functions/v2/https';
 import {FieldValue,Timestamp} from './admin.js';
 import {parseResult} from './ai-provider.js';
+import {plainText} from './service-policy.js';
+import {decodePhotos} from './photos.js';
 import {buckets,configFrom,maxCost,usageCost,validateStyle} from './ai-config.js';
 export const generationId=(uid,key)=>createHash('sha256').update(uid+'\0'+key).digest('hex');
 const terminal=s=>['succeeded','failed_refunded'].includes(s);
 export function validateInput(data){
+ if(data&&Buffer.byteLength(JSON.stringify(data))>9*1024*1024)throw new HttpsError('invalid-argument','생성 요청은 9MiB 이하이어야 합니다.');
  if(!data||typeof data.requestId!=='string'||!/^[a-zA-Z0-9_-]{1,100}$/.test(data.requestId))throw new HttpsError('invalid-argument','고유 요청 ID가 필요합니다.');
  const input={};
  for(const [k,max] of Object.entries({title:500,memo:2000,content:12000,placeInfo:2000,type:50,volume:10})){
-  const v=data[k]??'';if(typeof v!=='string'||v.length>max)throw new HttpsError('invalid-argument','입력 길이 또는 형식을 확인하세요.');input[k]=v;
+  const v=data[k]??'';if(typeof v!=='string'||v.length>max)throw new HttpsError('invalid-argument','입력 길이 또는 형식을 확인하세요.');input[k]=plainText(v,max);
  }
  if(!input.title.trim()||!input.content.trim()||!['short','normal','long'].includes(input.volume)||!['맛집','카페','여행','숙소','캠핑','미용','쇼핑','투어','전시'].includes(input.type))throw new HttpsError('invalid-argument','제목·내용·유형·분량이 필요합니다.');
- if(data.photos?.length)throw new HttpsError('invalid-argument','사진은 비공개 업로드 API를 먼저 사용하세요.');
- const photoGroupId=data.photoGroupId??null;
- if(photoGroupId!==null&&(typeof photoGroupId!=='string'||!/^[a-f0-9]{64}$/.test(photoGroupId)))throw new HttpsError('invalid-argument','사진 ID 오류');
- return {input,photoGroupId,requestId:data.requestId};
+ if(data.photoGroupId)throw new HttpsError('invalid-argument','사진은 생성 요청에만 임시로 첨부해주세요.');
+ return {input,requestId:data.requestId};
 }
-export async function reserveGeneration(db,uid,data,{now=Date.now(),enqueue=true}={}){
- const {input,photoGroupId,requestId}=validateInput(data);
+export async function reserveGeneration(db,uid,data,{now=Date.now(),enqueue=false}={}){
+ const {input,requestId}=validateInput(data);
+ const currentConfig=configFrom(await db.doc('ops/ai').get());
+ const {photos}=decodePhotos(data.photos||[],currentConfig);
+ const photoManifest=photos.map(p=>({index:p.index+1,mime:p.mime,size:p.size,sha256:p.sha256}));
  const id=generationId(uid,requestId),ref=db.doc(`generations/${id}`);
- const fingerprint=createHash('sha256').update(JSON.stringify({input,photoGroupId})).digest('hex');
+ const fingerprint=createHash('sha256').update(JSON.stringify({input,photoManifest})).digest('hex');
  return db.runTransaction(async tx=>{
   const internalRef=db.doc(`generationInternal/${id}`);
   const [old,user,ops,deleted,internal]=await tx.getAll(ref,db.doc(`users/${uid}`),db.doc('ops/ai'),db.doc(`deletedUsers/${uid}`),internalRef);
@@ -31,8 +35,6 @@ export async function reserveGeneration(db,uid,data,{now=Date.now(),enqueue=true
   const day=new Date(now).toISOString().slice(0,10),minute=Math.floor(now/60000);
   const budgetRef=db.doc(`dailyCosts/${day}`);
   const budget=await tx.get(budgetRef);
-  const group=photoGroupId?await tx.get(db.doc(`photoGroups/${photoGroupId}`)):null;
-  if(group&&(!group.exists||group.data().uid!==uid||group.data().status!=='ready'))throw new HttpsError('permission-denied','사용할 수 없는 사진입니다.');
   const u=user.data(),balance=buckets(u);
   if(u.credits<1)throw new HttpsError('resource-exhausted','크레딧이 없습니다. 충전 기능은 준비 중입니다.');
   const limits=u.aiLimits||{};
@@ -44,17 +46,17 @@ export async function reserveGeneration(db,uid,data,{now=Date.now(),enqueue=true
   balance[creditType==='free'?'freeCredits':'paidCredits']--;
   balance[creditType==='free'?'heldFree':'heldPaid']++;
   const createdAt=FieldValue.serverTimestamp();
-  const style=validateStyle(u.blogStyle||{preset:'jaeinit'});
-  const value={uid,requestId,fingerprint,status:'reserved',phase:'queued',creditType,photoGroupId,input,style,config:c,
-   day,budgetReservedMicros:bound,leaseUntil:Timestamp.fromMillis(now+c.timeoutMs+120000),createdAt,updatedAt:createdAt,schemaVersion:2};
+  const styleDoc=u.activeStyleId?await tx.get(db.doc(`users/${uid}/styles/${u.activeStyleId}`)):null;
+  const style=validateStyle(styleDoc?.data()?.style||u.blogStyle||{preset:'jaeinit'});
+  const value={uid,requestId,fingerprint,status:'reserved',phase:'queued',creditType,photoCount:photos.length,photoManifest,input,style,config:c,
+   day,budgetReservedMicros:bound,leaseUntil:Timestamp.fromMillis(now+c.timeoutMs+120000),createdAt,updatedAt:createdAt,schemaVersion:3};
   const {config:privateConfig,budgetReservedMicros,day:privateDay,fingerprint:privateHash,...publicValue}=value;
   tx.create(ref,publicValue);
   tx.create(internalRef,{config:privateConfig,budgetReservedMicros,day:privateDay,fingerprint:privateHash});
-  if(enqueue)tx.create(db.doc(`generationJobs/${id}`),{uid,generationId:id,createdAt});
+  // No image bytes or work items are persisted. The accepting HTTP invocation owns execution.
   tx.update(user.ref,{...balance,credits:u.credits-1,activeGenerations:(u.activeGenerations||0)+1,
    aiLimits:{minute,minuteCount:minuteCount+1,day,dayCount:dayCount+1},updatedAt:createdAt});
   tx.set(budgetRef,{day,reservedMicros:(b.reservedMicros||0)+bound,spentMicros:b.spentMicros||0});
-  if(group)tx.update(group.ref,{expiresAt:group.data().savedRefs>0?FieldValue.delete():Timestamp.fromMillis(now+c.retentionDays*86400000),lastUsedAt:createdAt});
   tx.create(db.doc(`creditLedger/${id}_reserve`),{uid,delta:-1,balanceAfter:u.credits-1,reason:'generation_reserve',creditType,referenceId:id,createdAt});
   return {generationId:id,status:'reserved',creditsRemaining:u.credits-1,duplicate:false};
  });
@@ -100,7 +102,7 @@ async function settle(db,id,{result=null,errorCode=null,usage=null,provider='unk
   return true;
  });
 }
-export async function runGeneration(db,id,{provider,loadPhotos=async()=>[],now=()=>Date.now()}={}){
+export async function runGeneration(db,id,{provider,photos=[],now=()=>Date.now()}={}){
  const attempt=randomUUID(),ref=db.doc(`generations/${id}`);
  const job=await db.runTransaction(async tx=>{
   const g=await tx.get(ref);
@@ -120,7 +122,8 @@ export async function runGeneration(db,id,{provider,loadPhotos=async()=>[],now=(
  const timeout=new Promise((_,reject)=>{timer=setTimeout(()=>{abort.abort();reject(Object.assign(new Error('timeout'),{code:'timeout'}));},job.config.timeoutMs);});
  let lastProgress=0,lastPhase='';
  const work=(async()=>{
-  const photos=await loadPhotos(job.uid,job.photoGroupId);
+  const manifest=photos.map(p=>({index:p.index+1,mime:p.mime,size:p.size,sha256:p.sha256}));
+  if(job.photoCount && JSON.stringify(manifest)!==JSON.stringify(job.photoManifest))throw Object.assign(new Error('attachments_lost'),{code:'attachments_lost'});
   const allowed=await db.runTransaction(async tx=>{
    const [g,ops,deleted]=await tx.getAll(ref,db.doc('ops/ai'),db.doc(`deletedUsers/${job.uid}`));
    if(!g.exists||g.data().status!=='running'||g.data().attempt!==attempt||g.data().leaseUntil.toMillis()<now()||deleted.exists||!configFrom(ops).enabled)return false;
@@ -131,7 +134,7 @@ export async function runGeneration(db,id,{provider,loadPhotos=async()=>[],now=(
    if(now()-lastProgress<500&&update.phase===lastPhase)return;lastProgress=now();lastPhase=update.phase;
    await db.runTransaction(async tx=>{
     const g=await tx.get(ref);if(!g.exists||g.data().status!=='running'||g.data().attempt!==attempt)return;
-    tx.update(ref,{phase:update.phase,partialText:String(update.text||'').slice(0,100000),updatedAt:FieldValue.serverTimestamp()});
+    tx.update(ref,{phase:update.phase,updatedAt:FieldValue.serverTimestamp()});
    });
   }});
  })();
@@ -152,6 +155,4 @@ export async function recoverExpired(db,{now=Date.now(),limit=100}={}){
  for(const g of snapshot.docs)if(!terminal(g.data().status))if(await settle(db,g.id,{errorCode:'expired',now}))recovered++;
  return {recovered};
 }
-export async function saveBlogStyle(db,uid,style){
- const value=validateStyle(style);await db.doc(`users/${uid}`).update({blogStyle:value,updatedAt:FieldValue.serverTimestamp()});return value;
-}
+export {saveBlogStyle} from './member-features.js';

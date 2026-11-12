@@ -1,11 +1,11 @@
 import {auth} from './firebase.js';
-import {generate,uploadPhotos,getGeneration,watchGenerations} from './api.js';
+import {generate,getGeneration,watchGenerations} from './api.js';
 const el=id=>document.getElementById(id);
 const active=g=>['reserved','running'].includes(g.status);
 const phases={queued:'생성 요청 접수 · 1크레딧 예약',starting:'서버 작업 시작',searching:'장소 정보 검색 중',generating:'Claude가 포스팅 작성 중',completed:'생성 완료',refunded:'생성 실패 · 예약 크레딧 복구 완료'};
 export function initGenerationUI({onResult,onError}){
  let uid=null,epoch=0,stop=()=>{},current=null,waiting=false;
- const handled=new Set();
+ const handled=new Set(),attachments=new Map();
  const key=()=>`jaeinit_generation_pending_${uid}`;
  const read=()=>{try{return JSON.parse(localStorage.getItem(key())||'null');}catch{return null;}};
  const store=p=>localStorage.setItem(key(),JSON.stringify(p));
@@ -15,9 +15,10 @@ export function initGenerationUI({onResult,onError}){
   const started=epoch;
   const full=await getGeneration(record.id);
   if(started!==epoch)return;
+  full.imgs=attachments.get(record.id)||[];
   await onResult(full);
   if(started!==epoch)return;
-  message((full.provider==='mock'?'테스트(mock) ':'')+'생성 완료 · 1크레딧 사용'+(full.photosExpired?' · 미저장 사진의 보관 기간이 지났습니다.':''));
+  message((full.provider==='mock'?'테스트(mock) ':'')+'생성 완료 · 1크레딧 사용 · 사진은 서버에 저장되지 않습니다'+(full.photosExpired?' · 미저장 사진의 보관 기간이 지났습니다.':''));
  }
  function render(records){
   el('generationHistory').replaceChildren(...records.map(g=>{
@@ -33,7 +34,7 @@ export function initGenerationUI({onResult,onError}){
   busy:()=>waiting||!!(current&&active(current)),
   profile(profile){el('creditHint').textContent=(profile?.credits===0?'잔액 0개 · 크레딧 충전 기능은 준비 중입니다. ':'')+'새 AI 생성 1회 = 1크레딧 예약 · 실패 시 원래 크레딧으로 복구 · 복사/수정/저장은 무료';},
   session(nextUid){
-   epoch++;stop();uid=nextUid;current=null;waiting=false;handled.clear();el('generationHistory').replaceChildren();button();
+   epoch++;stop();uid=nextUid;current=null;waiting=false;handled.clear();attachments.clear();el('generationHistory').replaceChildren();button();
    if(!uid)return;
    const sessionEpoch=epoch;
    stop=watchGenerations(uid,records=>{
@@ -44,7 +45,7 @@ export function initGenerationUI({onResult,onError}){
     if(!g)return;
     current=g;waiting=false;
     if(active(g)){
-     if(!pending)store({requestId:g.requestId,id:g.id,payload:{...g.input,requestId:g.requestId,photoGroupId:g.photoGroupId}});
+     if(!pending)store({requestId:g.requestId,id:g.id,payload:{...g.input,requestId:g.requestId}});
      message(phases[g.phase]||'생성 진행 상태 복구 중');
      el('load').className='load on';el('lst').textContent=phases[g.phase]||'처리 중';
      el('sb').textContent=g.partialText||'';el('lb').style.width=g.phase==='generating'?'65%':'25%';
@@ -67,13 +68,8 @@ export function initGenerationUI({onResult,onError}){
     pending.id=[...new Uint8Array(digest)].map(b=>b.toString(16).padStart(2,'0')).join('');store(pending);
    }
    try{
-    if(photos.length&&!pending.payload.photoGroupId){
-     message('사진을 비공개 저장소에 업로드 중');
-     const uploaded=await uploadPhotos({requestId:pending.requestId,photos});
-     if(started!==epoch)return;
-     pending.payload.photoGroupId=uploaded.photoGroupId;store(pending);
-    }
-    const accepted=await generate(pending.payload,()=>message('서버 요청 접수 중'));
+    attachments.set(pending.id,[...photos]);
+    const accepted=await generate({...pending.payload,photos},()=>message('서버 요청 접수 중'));
     if(started!==epoch)return;
     if(current?.id===accepted.generationId&&!active(current)){localStorage.removeItem(key());return;}
     pending.id=accepted.generationId;store(pending);message('생성 요청이 접수됐습니다. 페이지를 새로고침해도 서버 결과를 복구합니다.');

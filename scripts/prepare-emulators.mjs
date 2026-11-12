@@ -2,9 +2,9 @@ import {ensureArtifact, requiredArtifacts, checkJava, cacheDirectory} from './em
 const args=process.argv.slice(2);
 try{
  const preflight=args[0]==='--preflight';
- const targets=preflight?await requiredArtifacts(args.slice(1)):['firestore',...(args.includes('--storage')?['storage']:[]),...(args.includes('--ui')?['ui']:[])];
+ const targets=preflight?await requiredArtifacts(args.slice(1)):['firestore',...(args.includes('--ui')?['ui']:[])];
  console.log(`Firebase emulator cache: ${cacheDirectory}`);
- if(targets.some(t=>['firestore','storage'].includes(t)))checkJava();
+ if(targets.some(t=>['firestore'].includes(t)))checkJava();
  const reuseFrom=[];
  for(let i=0;i<args.length;i++)if(args[i]==='--reuse-from'){
   if(!args[i+1])throw new Error('--reuse-from requires an existing official-cache directory.');

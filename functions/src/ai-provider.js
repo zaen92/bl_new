@@ -1,3 +1,4 @@
+import {plainText} from './service-policy.js';
 import {buildPrompt} from './prompt.js';
 export class ProviderError extends Error{
  constructor(code,usage=null){super(code);this.code=code;this.usage=usage;}
@@ -11,11 +12,11 @@ export function parseResult(text){
  const result={};
  for(const field of resultFields){
   if(typeof value[field]!=='string'||value[field].length>(field==='body'?60000:10000))throw new ProviderError('invalid_result');
-  result[field]=value[field];
+  try{result[field]=plainText(value[field],field==='body'?60000:10000);}catch{throw new ProviderError('invalid_result');}
  }
  if(['title_1','title_2','title_3','body'].some(f=>!result[f].trim()))throw new ProviderError('empty_result');
  if(!Array.isArray(value.hashtags)||value.hashtags.length>50||value.hashtags.some(t=>typeof t!=='string'||t.length>200))throw new ProviderError('invalid_result');
- result.hashtags=value.hashtags;
+ try{result.hashtags=value.hashtags.map(t=>plainText(t,200));}catch{throw new ProviderError('invalid_result');}
  return result;
 }
 export async function* readSSE(body){

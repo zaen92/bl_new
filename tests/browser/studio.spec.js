@@ -12,8 +12,9 @@ async function seed(page){
   }
  },{result});
 }
-test('legacy migration, original result panels, safe preview, photos, draft and local save persist after reload',async({page})=>{
+test('legacy migration, original result panels, safe preview, transient photos, text draft and local save survive reload',async({page})=>{
  const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ page.on('dialog',d=>d.accept());
  await seed(page);await page.goto('/');
  await expect(page.locator('#savedCount')).toHaveText('1');
  expect(await page.evaluate(()=>localStorage.getItem('jaeinit_claude_key'))).toBeNull();
@@ -29,16 +30,13 @@ test('legacy migration, original result panels, safe preview, photos, draft and 
  await page.locator('#tabPreview').click();await expect(page.locator('#previewArea img')).toHaveCount(1);
  await page.reload();await expect(page.locator('#ti')).toHaveValue('작성 원문 제목');
  await expect(page.locator('#ci')).toHaveValue('기존 내용이 유실되지 않음');
- await expect(page.locator('#pg .pi')).toHaveCount(1);
+ await expect(page.locator('#pg .pi')).toHaveCount(0);
  await expect(page.locator('#btxt')).toContainText('원래 본문');
  await page.locator('#saveBtn').click();await expect(page.locator('#saveBtn')).toHaveText('✅ 기기에 저장됨');
  await page.locator('#tabSaved').click();await expect(page.locator('#savedList')).toContainText('기존 v3 글');
- const downloadPromise=page.waitForEvent('download');await page.locator('#backupBtn').click();
- const download=await downloadPromise;expect(download.suggestedFilename()).toBe('jaeinit-backup.json');
- const backup=JSON.parse(await readFile(await download.path(),'utf8'));
- expect(backup.posts.some(p=>p.imgs?.length===1)).toBe(true);
- expect(backup.draft.form.ci).toBe('기존 내용이 유실되지 않음');
- expect(JSON.stringify(backup)).not.toContain('obsolete-secret');
+ await page.locator('#backupBtn').click();await expect(page.locator('#eb')).toContainText('로그인');
+ const draft=await page.evaluate(()=>new Promise(r=>{const q=indexedDB.open('jaeinit-studio');q.onsuccess=()=>{const tx=q.result.transaction('drafts');const req=tx.objectStore('drafts').get('current');req.onsuccess=()=>r(req.result);};}));
+ expect(draft.imgs).toEqual([]);expect(draft.form.ci).toBe('기존 내용이 유실되지 않음');
  await page.screenshot({path:'test-results/studio.png',fullPage:true});
  expect(errors).toEqual([]);
 });
@@ -49,18 +47,19 @@ test('anonymous generation is blocked without direct provider request and does n
  await expect(page.locator('#ti')).toHaveValue('유지할 제목');expect(providerCalls).toEqual([]);
 });
 test('stored external HTML is escaped; deletion does not reimport preserved legacy source',async({page})=>{
+ page.on('dialog',d=>d.accept());
  await page.addInitScript(()=>localStorage.setItem('jaeinit_saved_posts',JSON.stringify([{id:1,title:'공격 문자열',data:{body:'<img src=x onerror=alert(1)>',title_1:'<script>bad</script>',place_name:'<img src=x onerror=alert(1)>',hashtags:['#<img/src=x/onerror=alert(1)>']}}])));
  await page.goto('/');await expect(page.locator('#savedCount')).toHaveText('1');await page.locator('#tabSaved').click();
  await page.getByRole('button',{name:'📄 불러오기',exact:true}).click();
  await expect(page.locator('#placeInfo img')).toHaveCount(0);
  await page.locator('#tabPreview').click();await expect(page.locator('#previewArea img')).toHaveCount(0);
  await page.locator('#tabSaved').click();
- page.on('dialog',dialog=>dialog.accept());await page.getByRole('button',{name:'🗑️ 기기 보관함 전체 삭제'}).click();
+ await page.getByRole('button',{name:'🗑️ 기기 보관함 전체 삭제'}).click();
  await expect(page.locator('#savedCount')).toHaveText('');await page.reload();await expect(page.locator('#savedCount')).toHaveText('');
  expect(await page.evaluate(()=>localStorage.getItem('jaeinit_saved_posts'))).toContain('공격 문자열');
 });
 
-test('JSON import preserves active draft, restores photos and remains idempotent',async({page})=>{
+test('JSON import preserves active draft, restores text/photo placement without images and remains idempotent',async({page})=>{
  await page.goto('/');await expect(page.locator('#savedCount')).toHaveText('');
  await page.locator('#ti').fill('작성 중 제목');await page.locator('#tabSaved').click();
  page.on('dialog',d=>d.accept());
@@ -70,5 +69,6 @@ test('JSON import preserves active draft, restores photos and remains idempotent
  await page.locator('#backupFile').setInputFiles(file);await expect(page.locator('#savedCount')).toHaveText('1');
  await expect(page.locator('#ti')).toHaveValue('작성 중 제목');
  await page.getByRole('button',{name:'📄 불러오기',exact:true}).click();
- await expect(page.locator('#ci')).toHaveValue('복원한 원문');await expect(page.locator('#pg img')).toHaveCount(1);
+ await expect(page.locator('#ci')).toHaveValue('복원한 원문');await expect(page.locator('#pg img')).toHaveCount(0);
+ await expect(page.locator('#btxt')).toContainText('[사진1]');
 });
