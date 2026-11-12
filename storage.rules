@@ -1,14 +1,10 @@
 rules_version = '2';
 service firebase.storage {
  match /b/{bucket}/o {
-  // No public download tokens or client writes. Server controls quota, MIME and
-  // ownership; authenticated reads still pass normal Storage/Firebase Auth rules.
-  match /users/{uid}/{path=**} {
-   allow read: if request.auth != null && request.auth.uid == uid
-     && request.auth.token.email_verified == true
-     && !firestore.exists(/databases/(default)/documents/deletedUsers/$(uid));
-   allow write: if false;
-  }
+  // Firebase's REST metadata/media endpoint can mint public download tokens even
+  // on an authenticated read. All browser access is therefore denied. Verified
+  // owners receive photo bytes only through getPost/getGeneration, whose Admin
+  // reads do not mint tokens and enforce current Auth state and ownership.
   match /{path=**} {allow read,write: if false;}
  }
 }

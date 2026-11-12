@@ -38,7 +38,7 @@ Server API는 Auth의 현재 verified/disabled 상태를 확인합니다. `ENFOR
 
 ## 사진
 
-신규 화면 사진은 서버 검증 후 `/users/{uid}/photos/{group}/{index}`에 저장합니다. 클라이언트 직접 쓰기는 거부하며 읽기는 verified 소유자만 허용합니다. 서버는 공개 Firebase 다운로드 토큰이나 signed URL을 만들지 않습니다. 결과/글 읽기 API도 소유권을 확인한 뒤 사진 데이터를 전달합니다.
+신규 화면 사진은 서버 검증 후 `/users/{uid}/photos/{group}/{index}`에 저장합니다. Storage 직접 읽기·쓰기는 소유자도 거부합니다. Firebase REST의 인증 읽기에도 공개 토큰이 자동 생성되는 동작을 막기 위한 구조입니다. verified 소유자는 getPost/getGeneration 서버 API로 사진을 읽습니다. 서버는 공개 Firebase 다운로드 토큰이나 signed URL을 만들지 않습니다. 결과/글 읽기 API도 소유권을 확인한 뒤 사진 데이터를 전달합니다.
 
 기본 최대 10장, 장당 decoded 2MiB, 합계 decoded 6MiB, 회원별 **200,000,000 bytes**입니다. 원래 1400px/JPEG 압축을 유지합니다. 업로드 이전에 quota를 트랜잭션 예약하고 완료 시 실사용으로 옮깁니다. 실패·서버 중단 업로드는 정리 후 한 번만 quota를 풀어줍니다. 초과 시 기기 원본은 지우지 않습니다.
 
@@ -59,7 +59,7 @@ Server API는 Auth의 현재 verified/disabled 상태를 확인합니다. `ENFOR
 1. 실제 Functions/Storage/스케줄을 사용하는 별도 테스트 프로젝트는 Blaze와 관련 IAM 설정을 준비합니다. 이 작업에서는 활성화/배포하지 않았습니다. 별도 테스트 Firebase 프로젝트에서 Auth/Firestore/Storage를 활성화하고 해당 bucket 이름을 확인합니다. 기존 프로젝트 Web 공개 설정은 `.env.local`; 실제 provider 비밀은 넣지 않습니다.
 2. Firebase Secret Manager에 CLI 보안 프롬프트로 `CLAUDE_API_KEY`, `NAVER_CLIENT_ID`, `NAVER_CLIENT_SECRET`, 기존 `SIGNUP_IDENTITY_HMAC_KEY`를 등록합니다. 예: `firebase functions:secrets:set CLAUDE_API_KEY --project TEST_PROJECT_ID`. 값은 채팅/명령행 인수/소스에 넣지 않습니다.
 3. 비밀이 아닌 Functions 환경 설정 `functions/.env.TEST_PROJECT_ID`에 `AI_PROVIDER_MODE=anthropic`, `STORAGE_BUCKET=실제_bucket`, 필요 시 `ENFORCE_APP_CHECK=true`를 설정합니다. HMAC 키를 재생성하지 않습니다. 아직 실제 배포는 하지 않았습니다.
-4. `firestore.rules`, `firestore.indexes.json`, `storage.rules`, Functions 스케줄/Firestore/Auth 트리거와 Storage/Firestore 서비스 권한을 승인된 배포 단계에서 적용합니다. Storage Rules의 cross-Firestore 조회 권한과 bucket CORS는 실제 테스트 프로젝트에서 확인해야 합니다.
+4. `firestore.rules`, `firestore.indexes.json`, `storage.rules`, Functions 스케줄/Firestore/Auth 트리거와 Storage/Firestore 서비스 권한을 승인된 배포 단계에서 적용합니다. Storage 직접 클라이언트 접근은 열지 않습니다. 서버 서비스 계정의 bucket IAM과 실제 테스트 프로젝트에서의 소유권·삭제 동작을 확인해야 합니다.
 5. 관리자 custom claim을 가진 본인 계정으로 `updateAIConfig`를 사용해 model/rates/limits/pause를 검토합니다. 비용 collection은 사용자 브라우저에 노출하지 않습니다.
 6. 실제 테스트 시 1회 생성의 generationCosts usage/chargedMicros/estimated/provider와 Anthropic usage·청구서를 대조합니다. 본 단계에 실제 키가 없으므로 유료 실제 API 호출/실제 비용 측정은 미실행입니다.
 
