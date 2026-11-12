@@ -36,6 +36,9 @@ test('two compressed photos render, save free, copy text to cloud and reopen wit
  await page.locator('#cloudSavedList').getByRole('button',{name:'📄 불러오기',exact:true}).click();
  await expect(page.locator('#pg img')).toHaveCount(0);await expect(page.locator('#stxStatus')).toHaveText('크레딧 4개');await expect(page.locator('#btxt')).toContainText('[사진2]');
  const post=(await db.collection('posts').where('uid','==',uid).get()).docs[0].data();expect(post.photoPositions).toEqual([1,2]);expect(JSON.stringify(post)).not.toContain('data:image');
+ await page.locator('#tabSaved').click();await page.locator('#cloudSavedList').getByRole('button',{name:'🗑️ 계정 글 삭제',exact:true}).click();await expect(page.locator('#cloudSavedList').getByRole('button',{name:'📄 불러오기',exact:true})).toHaveCount(0);
+ await page.getByRole('button',{name:'☁️ 내 계정에 복사',exact:true}).first().click();await expect(page.locator('#cloudSavedList').getByRole('button',{name:'📄 불러오기',exact:true})).toHaveCount(1);
+ await expect(page.locator('#stxStatus')).toHaveText('크레딧 4개');
 });
 test('refresh restores in-flight generation without repeating AI request or debit',async({page})=>{
  const uid=await signIn(page);await form(page,'새로고침 복구');await page.locator('#gb').click();

@@ -291,7 +291,7 @@ function postCard(post,cloud=false){
     applySnapshot(loaded);await persistDraft();switchTab('result');await updateSavedCount();
   }),action('📋 복사',()=>cpTxt(`[제목]\n${post.title}\n\n[본문]\n${nl(post.data?.body||'')}\n\n[해시태그]\n${(post.data?.hashtags||[]).join(' ')}`)));
   if(cloud){
-    buttons.append(action('✏️ 현재 내용으로 계정 글 수정',async()=>{if(!resultData)throw new Error('수정할 결과를 먼저 불러오세요.');await saveCloudPost({id:post.id,expectedVersion:post.version,requestId:crypto.randomUUID(),post:{...snapshot(),title:resultData.title_1||post.title}});} ),action('🗑️ 계정 글 삭제',async()=>{if(confirm('계정의 이 글을 삭제할까요?'))await deleteCloudPost({id:post.id,requestId:crypto.randomUUID()});}));
+    buttons.append(action('✏️ 현재 내용으로 계정 글 수정',async()=>{if(!resultData)throw new Error('수정할 결과를 먼저 불러오세요.');await saveCloudPost({id:post.id,expectedVersion:post.version,requestId:crypto.randomUUID(),post:{...snapshot(),title:resultData.title_1||post.title}});} ),action('🗑️ 계정 글 삭제',async()=>{if(confirm('계정의 이 글을 삭제할까요?')){await deleteCloudPost({id:post.id,requestId:crypto.randomUUID()});const uid=auth.currentUser?.uid;for(const p of await localPosts())if(p.cloudLinks?.[uid]?.id===post.id){const links={...p.cloudLinks};delete links[uid];await putLocalPost({...p,cloudLinks:links});}await renderSavedList();}}));
   }
   if(!cloud){
     buttons.append(action('☁️ 내 계정에 복사',async()=>{

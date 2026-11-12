@@ -77,5 +77,5 @@ test('legacy single blogStyle migrates without loss, configurable limits and oth
 test('JSON allowlist strips old photos, privileges, counters, tokens and restores only text and placement',()=>{
  const image='data:image/png;base64,YQ==';const dirty={...payload('import').post,imgs:[image],tier:'PRO',credits:999,token:'secret',exportsUsed:0,legacyRaw:image,style:{greeting:'인사',apiKey:'secret'}};
  const clean=textDocument(dirty),json=JSON.stringify(clean);for(const word of ['data:image','secret','PRO','credits','exportsUsed','legacyRaw'])assert.ok(!json.includes(word));assert.deepEqual(clean.photoPositions,[1]);assert.equal(clean.style.greeting,'인사');assert.deepEqual(clean.imgs,[]);
- for(const bad of [{data:{body:42}},{data:{body:'x',hashtags:'bad'}},{form:{ci:'data:image/png;base64,YQ=='}}])assert.throws(()=>textDocument(bad));
+ for(const bad of [{form:42},{style:[]},{data:{body:42}},{data:{body:'x',hashtags:'bad'}},{form:{ci:'data:image/png;base64,YQ=='}}])assert.throws(()=>textDocument(bad));
 });

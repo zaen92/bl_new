@@ -4,6 +4,7 @@ const fields=['title_1','title_2','title_3','keyword_main','keyword_sub','keywor
 function text(value,max=60000){if(value==null)return '';if(typeof value!=='string'||value.length>max||/data:image|blob:|iVBORw0KGgo[A-Za-z0-9+/]{50}|\/9j\/[A-Za-z0-9+/]{100}/i.test(value))throw new Error('사진 데이터 없이 올바른 텍스트 JSON을 사용하세요.');return value;}
 export function textDocument(p){
  if(!p||typeof p!=='object'||Array.isArray(p))throw new Error('글 데이터 형식 오류');
+ for(const key of ['form','style'])if(p[key]!=null&&(typeof p[key]!=='object'||Array.isArray(p[key])))throw new Error('작성 설정 형식 오류');
  if(p.imgs!==undefined&&!Array.isArray(p.imgs))throw new Error('사진 목록 형식 오류');
  if(p.data!==undefined&&p.data!==null&&(typeof p.data!=='object'||Array.isArray(p.data)||typeof p.data.body!=='string'))throw new Error('본문 데이터 형식 오류');
  const data=p.data?Object.fromEntries(fields.map(f=>[f,text(p.data[f],f==='body'?60000:10000)])):null;

@@ -1,3 +1,15 @@
+# STEP 2 최종 정책 CI (현재)
+
+Actions → STEP 2 AI generation mock tests → Run workflow → codex/step2-ai-generation, 또는 해당 브랜치 push로 실행합니다. Node/Java/lockfile 설치와 공식 Firestore checksum 검증 후 **Auth/Firestore/Functions**를 구동합니다. 앱 사진 Storage 설정/JAR/cache는 사용하지 않습니다.
+
+통합 58 = 기존/변경 unit·보안·서버 18 + provider 10 + 서버 16 + 보안 3 + 정책 11. UI 4 + Auth 2 + 정책 E2E 6을 합쳐 **고유 앱 70개**, CI 도구 3개는 별도입니다. 별도 unit 7/provider 10은 중복 실행이므로 합산하지 않습니다. 모든 mandatory case의 정확한 passed count/skip 0/exit code를 검사합니다. TLS 검증은 유지합니다. Google 팝업은 외부 SDK cold-load를 포함하므로 별도 60초 timeout과 query 없는 안전한 단계 진단을 기록합니다. 실패를 숨기지 않습니다.
+
+기존 STEP 1 workflow/브랜치는 보존합니다. 이번 정책과 충돌한 테스트 교체는 POLICY_MIGRATION.md에 설명합니다. 가린 로그/수치 receipt만 artifact로 7일 보관하며 원시 debug/인증 파일/브라우저 trace/Emulator 데이터는 올리지 않습니다. 실제 최종 실행 URL/결과는 VALIDATION.md를 확인하세요.
+
+---
+
+## 이전 정책 CI 기록 (현재 설정 아님)
+
 # STEP 2 CI
 
 `codex/step2-ai-generation` push 또는 Actions → **STEP 2 AI generation mock tests** → Run workflow → 해당 브랜치로 실행합니다. `.github/workflows/step2-tests.yml`은 원래 STEP 1 workflow를 보존한 별도 구성입니다.
