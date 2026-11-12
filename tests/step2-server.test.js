@@ -34,7 +34,7 @@ test('free signup 5 -> five successes -> zero; sixth blocked before AI',async()=
 test('free credits are reserved first and successful debit keeps remaining paid balance',async()=>{
  await db.doc(`users/${uid}`).update({credits:3,freeCredits:1,paidCredits:2});
  const g=await reserve('free-first');assert.equal((await user()).heldFree,1);assert.equal((await user()).paidCredits,2);
- await run(g.generationId);assert.equal((await user()).credits,5);assert.equal((await user()).heldFree,0);
+ await run(g.generationId);assert.equal((await user()).credits,2);assert.equal((await user()).heldFree,0);
 });
 test('API failure refunds the exact paid credit type and records known partial cost',async()=>{
  await db.doc(`users/${uid}`).update({credits:1,freeCredits:0,paidCredits:1});

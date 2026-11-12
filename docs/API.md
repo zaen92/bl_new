@@ -1,3 +1,27 @@
+# 현재 STEP 2 최종 정책 API
+
+모든 회원 API는 현재 Auth 상태/이메일 인증/삭제 marker를 검사합니다. 브라우저 provider 호출/비밀 입력/등급 변경은 허용하지 않습니다.
+
+- ensureProfile: ops/service.signupCredits(기본 5)를 최초에만 원자 지급. 기존 잔액/원장 보존.
+- requestGeneration({requestId,title,memo,content,placeInfo,type,volume,photos?:dataURL[]}): 최대 9MiB 요청/10장/장당 2MiB/decoded 합계 6MiB. 접수 chunk 후 같은 HTTP invocation에서 메모리 사진으로 AI 실행. 큐/Storage 업로드 없음. 동일 ID는 예약/AI를 반복하지 않음. 반환 {generationId,status,creditsRemaining,duplicate}. 완료 결과/단계는 Firestore/getGeneration으로 조회. 사진 자동 재개 불가, lease 만료 환급.
+- getGeneration({generationId}): 소유자의 텍스트 상태/결과/사진 수/검증 metadata, imgs=[], photosRequireAttachment=true. 이미지 bytes/URL 없음.
+- savePost({id,requestId,expectedVersion,post}): 이미지 없는 whitelist 글 저장/수정, FREE 신규 5개. CAS/멱등성/소유권 검증. 게시글 개수와 같은 트랜잭션.
+- getPost({id}), listPosts({cursor?,pageSize?:20}): 소유자 글만, 이미지 없음. pageSize 최대 50, cursor 소유권 검증. deletePost({id,requestId})는 공간 복구.
+- approveJSONExport({requestId,digest:sha256,bytes}): 파일 검증 후 승인. FREE 누적 5회/PRO 무제한. 같은 ID의 같은 파일은 중복 집계 없음. 파일 내용은 서버에 업로드하지 않음.
+- getBlogStyles, updateBlogStyle({id,style}), selectBlogStyle({id}), deleteBlogStyle({id}): FREE 1/PRO 여러 스타일. 기존 단일 blogStyle default 호환.
+- getServicePolicy: 회원용 비밀 없는 한도 조회. updateServicePolicy: 관리자만 ops/service 관리.
+- updateAIConfig, recoverGenerations: 관리자만, 기존 비용/제한/원장 보호 유지. recoverySchedule은 5분 주기 만료 환급만 수행.
+- accountDeleted: Auth 삭제 marker. 기존 사진 물리 정리는 별도 승인 migration.
+- createOrder/confirmPayment: 계속 unimplemented. PRO 전환 endpoint 없음.
+
+uploadGenerationPhotos/generationWorker/사진 cleanup scheduler는 새 소스에서 제거했습니다. 이미 배포된 원격 함수의 정리는 별도 승인된 배포 계획이 필요합니다.
+
+기능 한도는 resource-exhausted(details.feature=posts/exports/styles), 멱등 파일 충돌은 already-exists, 글 CAS 충돌은 aborted입니다. 생성 실패는 failed_refunded 및 안전한 errorCode로 표시합니다. 키/입력/이메일을 오류에 넣지 않습니다.
+
+---
+
+## 이전 정책 계약 보존 기록 (현재 적용 아님)
+
 # STEP 2 API (현재 브랜치)
 
 모든 사용자 API는 Firebase Callable, Auth 현재 이메일 인증/활성 상태 확인 후 실행합니다. 지역 `asia-northeast3`. 클라이언트 UID/잔액/스타일/가격은 신뢰하지 않습니다. 비용과 모델은 서버 설정을 사용합니다.

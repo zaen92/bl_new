@@ -1,3 +1,15 @@
+# 잰잇 블로그 스튜디오 — STEP 2 최종 FREE/PRO 정책
+
+기준 `56a1092`, 브랜치 `codex/step2-ai-generation`. 신규 이메일 인증 회원에게 최초 5크레딧, FREE 계정 글 5개/평생 JSON 내보내기 5회/스타일 1개를 제공합니다. PRO(결제 구현은 STEP 3)는 글·내보내기 상품상 무제한과 여러 스타일을 지원하며 잔액 0에도 유지합니다. 새 사진은 메모리 요청으로만 분석하며 서버·기기 DB·공식 JSON에 저장하지 않습니다. 사진 미리보기는 생성 직후 가능하고 다시 열면 재첨부합니다.
+
+현재 안내: [STEP2.md](docs/STEP2.md) · [API](docs/API.md) · [스키마](docs/SCHEMA.md) · [이전 사진/데이터 migration](docs/POLICY_MIGRATION.md) · [개인정보 안내 준비](docs/PRIVACY.md) · [검증 상태](docs/VALIDATION.md).
+
+앱 사진용 Firebase Storage 설정/Emulator는 필요하지 않습니다. Auth/Firestore/Functions Emulator를 사용하며 기존 CSS·결과 기능을 유지합니다. `scripts/local-setup.sh` 후 `npm run emulators`와 별도 터미널 `npm run dev`를 사용합니다. 실제 API 비밀은 Secret Manager에만 등록합니다. CI는 명시적 mock이며 결제/가격 확정/운영 배포는 하지 않았습니다.
+
+**아래는 이전 STEP 2/STEP 1의 보존 기록입니다. 무료 2회·Storage·사진 포함 JSON 안내는 폐기된 정책이며 현재 실행 안내로 사용하지 마세요.**
+
+---
+
 # 잰잇 블로그 스튜디오 — STEP 2 개발 브랜치
 
 현재 브랜치는 `codex/step2-ai-generation`이며 기준 STEP 1 `d83f78c`와 브랜치를 보존합니다. 서버 AI 호출, 예약/환급, 생성 이력, 비공개 Storage, 스타일·비용 제한을 추가했습니다. 실제 키 없이 CI에서는 Emulator-only mock으로 검증합니다. **실제 Anthropic/Naver 호출·결제·운영 배포는 실행하지 않았습니다.**

@@ -162,8 +162,13 @@ jobs:
       # Independent of Firestore readiness; an external Google SDK failure stays
       # a failed Auth step, never a skipped assertion or continue-on-error pass.
       - name: Email and Google Auth Emulator login
+        id: auth
         if: ${{ !cancelled() && steps.browser.outcome == 'success' }}
         run: node scripts/ci-run.mjs auth npm run test:auth
+
+      - name: 'Auth diagnostic: ${{ steps.auth.outputs.failures }}'
+        if: ${{ !cancelled() && steps.auth.outcome == 'failure' }}
+        run: echo 'Auth failed; Emulator and external SDK failures remain visible.'
 
       - name: STEP 2 browser E2E with real Emulators and explicit mock provider
         id: step2-e2e

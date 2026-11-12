@@ -1,3 +1,13 @@
+# 최종 FREE/PRO 정책 재검증 진행 — 2026-11-12
+
+기준 56a1092에서 정책을 변경했습니다. 이전 57개 성공 결과는 새 정책의 검증 완료 증거로 사용하지 않습니다. 현재 빌드/단위 7/provider 단위 10/UI 4/CI 도구 3 로컬 통과. Auth/Firestore/Functions 통합 58개 및 E2E 6개는 새 GitHub Actions 결과를 확인 중이며 아직 통과로 표시하지 않습니다.
+
+Storage 보관/2회 지급 테스트 교체 근거는 [POLICY_MIGRATION.md](POLICY_MIGRATION.md)에 기록했습니다. 실제 API 키/운영 배포/STEP 3는 수행하지 않습니다. 최종 결과는 실제 CI 완료 후 이 절을 갱신합니다.
+
+---
+
+## 이전 정책 검증 보존 기록
+
 # STEP 2 Emulator·mock 검증 완료 — 2026-11-12
 
 **STEP 2의 구현 및 Emulator/mock 필수 검증을 완료했습니다. 실제 유료 API·운영 Firebase 검증/배포는 수행하지 않았습니다.**

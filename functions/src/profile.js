@@ -37,7 +37,7 @@ export async function provisionProfile(db, identity, secret) {
     });
     if (!claim.exists) tx.create(claimRef, { firstUid: identity.uid, createdAt: timestamp, version: 1 });
     if (granted) tx.create(ledgerRef, {
-      uid: identity.uid, delta: credits, balanceAfter: 2, reason: 'signup',
+      uid: identity.uid, delta: credits, balanceAfter: credits, reason: 'signup',
       referenceId: claimId, createdAt: timestamp
     });
     return { created: true, credits };

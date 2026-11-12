@@ -1,3 +1,22 @@
+# 현재 schema v3 — 최종 FREE/PRO 정책
+
+- ops/service: signupCredits, freePostLimit, freeExportLimit, freeStyleLimit, proStyleLimit. 기본 5/5/5/1/50. 관리자 API만 쓰기.
+- users: 기존 credits/buckets/원장 연결 보존 + tier(FREE/PRO), signupClaimId, savedPostCount, exportsUsed, activeStyleId, styleCount. 브라우저 쓰기 금지. 과거 누락 필드는 ensureProfile에서 보완.
+- signupClaims: 기존 HMAC identity/firstUid/createdAt + exportsUsed. 회원 삭제·재가입/로그인/JSON으로 초기화하지 않음. 클라이언트 읽기/쓰기 금지.
+- users/{uid}/styles/{id}: uid,style,updatedAt. 본인 읽기/서버 쓰기. 기존 blogStyle default 호환.
+- posts: uid,title,type,volume,date,form,data(전체 생성 결과 텍스트),style,photoPositions,version,lastRequestId,createdAt,updatedAt,schemaVersion:3. 이미지 필드/신규 하위 chunks 없음. 저장 count와 원자 갱신.
+- exportApprovals/{sha256(uid+requestId)}: uid,digest,bytes,exportsUsed,createdAt. 원본 파일/사진 없음. 같은 ID는 같은 파일만 승인.
+- generations: 텍스트 input/style/result/status/phase/creditType/photoCount/photoManifest(순서/MIME/크기/해시)/lease와 시각. 원본 사진/Base64/부분 원문 없음.
+- generationInternal, generationCosts, dailyCosts, creditLedger: 기존 private 비용/멱등성/예약/확정/환급 구조 유지.
+- generationJobs/photoGroups/Storage 객체/새 photoChunks를 만들지 않습니다. 기존 자료는 읽기 경로를 닫고 관리자 migration까지 보존합니다.
+- deletedUsers: 계정 접근 차단 marker. 사진 전용 retention quota/scheduler 없음.
+
+과거 freeCredits 없는 잔액 bucket 분류의 2는 당시 지급량이며 현재 신규 5 지급과 다릅니다. 원장이나 기존 잔액을 바꾸지 않습니다. 자세한 migration은 [POLICY_MIGRATION.md](POLICY_MIGRATION.md).
+
+---
+
+## 이전 스키마 보존 기록 (현재 정책 아님)
+
 # STEP 2 additive schema
 
 `users`는 기존 credits/생성일을 유지하고 freeCredits,paidCredits,heldFree,heldPaid,activeGenerations,aiLimits,storageBytes,storageReservedBytes,blogStyle을 추가합니다. 최초 예약에서 STEP 1 잔액을 보존하며 bucket을 채웁니다. 신규 가입은 schemaVersion 2입니다.
