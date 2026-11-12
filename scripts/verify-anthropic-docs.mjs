@@ -29,11 +29,11 @@ for(const [name,url,required] of pages){
   source=sdk;verified=sdk.status===200&&sdk.text.includes(required);
  }
  const record={name,websiteURL:url,websiteStatus:page.status,websiteVerified,sourceURL:source.url,sourceStatus:source.status,verified,
-  verifiedContract:verified?required:null,sourceSHA256:source.text?createHash('sha256').update(source.text).digest('hex'):null,checkedAt:new Date().toISOString()};
+  verifiedContract:verified?(name==='pricing'?'pricing page available; rates require operator verification':required):null,sourceSHA256:source.text?createHash('sha256').update(source.text).digest('hex'):null,checkedAt:new Date().toISOString()};
  evidence.push(record);
  if(!verified&&name!=='pricing')throw new Error(`Official ${name} API contract could not be verified from either documentation or the official SDK API reference`);
  console.log(`${name}: ${verified?'verified':'NOT VERIFIED'}; source=${source.url}; website=${page.status}`);
  if(!verified)console.log('Pricing webpage unavailable: configured USD rates remain estimates requiring an operator check; no live billing was measured.');
 }
 await writeFile('.local/ci-reports/anthropic-doc-evidence.json',JSON.stringify(evidence,null,2)+'\n');
-if(process.env.GITHUB_OUTPUT)await appendFile(process.env.GITHUB_OUTPUT,`pricing=${evidence.at(-1).verified?'verified':'NOT VERIFIED; configured rates are estimates'}\n`);
+if(process.env.GITHUB_OUTPUT)await appendFile(process.env.GITHUB_OUTPUT,`pricing=${evidence.at(-1).verified?'page available; rates require operator verification':'NOT VERIFIED; configured rates are estimates'}\n`);

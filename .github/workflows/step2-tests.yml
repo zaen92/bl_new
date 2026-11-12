@@ -113,6 +113,10 @@ jobs:
         if: ${{ !cancelled() && steps.prepare.outcome == 'success' && steps.test-key.outcome == 'success' }}
         run: node scripts/ci-run.mjs step2-integration timeout --signal=TERM --kill-after=20s 6m npm test
 
+      - name: 'Failed assertions: ${{ steps.integration.outputs.failures }}'
+        if: ${{ !cancelled() && steps.integration.outcome == 'failure' }}
+        run: echo 'Required tests failed; this diagnostic does not pass the integration stage.'
+
       - name: 'Integration diagnostic: ${{ steps.integration.outputs.diagnostic }}'
         if: ${{ !cancelled() && steps.integration.outcome == 'failure' }}
         run: echo 'Integration failed; sanitized detail is in this step title and the test artifact.'
@@ -164,6 +168,7 @@ jobs:
         run: node scripts/ci-run.mjs auth npm run test:auth
 
       - name: STEP 2 browser E2E with real Emulators and explicit mock provider
+        id: step2-e2e
         if: ${{ !cancelled() && steps.browser.outcome == 'success' && steps.prepare.outcome == 'success' && steps.test-key.outcome == 'success' }}
         run: |
           node --input-type=module <<'NODE'
@@ -171,6 +176,10 @@ jobs:
           writeFileSync('functions/.env.local',readFileSync('functions/.env.local','utf8').replace('AI_MOCK_DELAY_MS=0','AI_MOCK_DELAY_MS=1200'));
           NODE
           node scripts/ci-run.mjs step2-e2e npm run test:step2:e2e
+
+      - name: 'Browser E2E diagnostic: ${{ steps.step2-e2e.outputs.failures }}'
+        if: ${{ !cancelled() && steps.step2-e2e.outcome == 'failure' }}
+        run: echo 'Browser E2E failed; see sanitized test evidence.'
 
       - name: Publish explicit pass/fail/not-run evidence
         if: ${{ always() && steps.checkout.outcome == 'success' }}

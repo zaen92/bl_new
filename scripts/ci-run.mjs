@@ -40,8 +40,11 @@ if(exitCode!==0){
  const safe=sanitizeLog(evidence||`Command failed with exit ${exitCode}`,secrets).replace(/%/g,'%25').replace(/\r/g,'%0D').replace(/\n/g,'%0A');
  console.log(`::error title=${stage} failed::${safe}`);
  if(process.env.GITHUB_OUTPUT){
-  const diagnostic=sanitizeLog(evidence,secrets).replace(/[\r\n]+/g,' | ').slice(-1800);
-  await appendFile(process.env.GITHUB_OUTPUT,'diagnostic='+diagnostic+'\n');
+  const plain=log.replace(/\x1b\[[0-?]*[ -/]*[@-~]/g,'');
+  const failures=[...plain.matchAll(/^not ok \d+[^\n]*\n[\s\S]*?(?=^# Subtest:|^ok \d+|^not ok \d+|^1\.\.|$(?![\s\S]))/gm)].map(m=>m[0]).join('\n');
+  const diagnostic=sanitizeLog(failures||evidence,secrets).replace(/[\r\n]+/g,' | ');
+  await appendFile(process.env.GITHUB_OUTPUT,'failures='+diagnostic.slice(0,2400)+'\n');
+  await appendFile(process.env.GITHUB_OUTPUT,'diagnostic='+diagnostic.slice(-1800)+'\n');
  }
 }
 await writeFile(join(directory,`${stage}.log`),log);

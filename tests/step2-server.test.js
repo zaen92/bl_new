@@ -77,7 +77,7 @@ test('late completion after recovery cannot charge again or resurrect a failed g
  const g=await reserve('late');let release,started;
  const ready=new Promise(r=>started=r);
  const running=run(g.generationId,async args=>{started();await new Promise(r=>release=r);return mockProvider()(args);});
- await Promise.race([ready,running.then(async()=>{throw new Error('Worker ended before provider start: '+JSON.stringify(await record(g.generationId)));})]);await recoverExpired(db,{now:now+600000});release();await running;
+ await Promise.race([ready,running.then(async()=>{const value=await record(g.generationId);throw new Error('Worker ended before provider start: '+JSON.stringify({status:value.status,phase:value.phase,errorCode:value.errorCode}));})]);await recoverExpired(db,{now:now+600000});release();await running;
  assert.equal((await user()).credits,2);assert.equal((await record(g.generationId)).status,'failed_refunded');
  assert.equal((await db.doc(`creditLedger/${g.generationId}_commit`).get()).exists,false);
 });
