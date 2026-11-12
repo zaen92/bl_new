@@ -14,7 +14,7 @@ export const cacheDirectory=resolve(process.env.FIREBASE_EMULATORS_PATH || join(
 const manifest=JSON.parse(await readFile(join(cliRoot,'lib/emulator/downloadableEmulatorInfo.json'),'utf8'));
 export function artifactFor(name){
  const item=name==='ui'?manifest.ui.main:manifest[name];
- if(!['firestore','ui'].includes(name) || !item || !/^[a-f0-9]{64}$/.test(item.expectedChecksumSHA256) || !/^[a-f0-9]{32}$/.test(item.expectedChecksum) || item.expectedSize<=0)throw new Error('Pinned official CLI artifact metadata is required.');
+ if(!['firestore','storage','ui'].includes(name) || !item || !/^[a-f0-9]{64}$/.test(item.expectedChecksumSHA256) || !/^[a-f0-9]{32}$/.test(item.expectedChecksum) || item.expectedSize<=0)throw new Error('Pinned official CLI artifact metadata is required.');
  const url=new URL(item.remoteUrl);
  if(url.protocol!=='https:' || url.hostname!=='storage.googleapis.com')throw new Error('Unexpected official artifact URL.');
  return {...item,name,fileName:item.downloadPathRelativeToCacheDir};
@@ -92,7 +92,7 @@ export async function requiredArtifacts(args){
  function option(name){const i=args.indexOf(name);return i>=0?args[i+1]:args.find(a=>a.startsWith(name+'='))?.slice(name.length+1);}
  const only=option('--only');
  const services=only?only.split(',').map(s=>s.split(':')[0]):['auth','firestore','functions'];
- const targets=services.includes('firestore')?['firestore']:[];
+ const targets=['firestore','storage'].filter(name=>services.includes(name));
  const command=args[0];
  const uiVisible=command==='emulators:start' || args.includes('--ui');
  if(uiVisible){

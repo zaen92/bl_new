@@ -23,7 +23,7 @@ export async function provisionProfile(db, identity, secret) {
     const timestamp = FieldValue.serverTimestamp();
     tx.create(userRef, {
       uid: identity.uid, email: identity.email, displayName: identity.displayName || '',
-      photoURL: identity.photoURL || '', credits, schemaVersion: 1,
+      photoURL: identity.photoURL || '', credits, freeCredits:credits, paidCredits:0, heldFree:0, heldPaid:0, schemaVersion: 2,
       createdAt: timestamp, updatedAt: timestamp
     });
     if (!claim.exists) tx.create(claimRef, { firstUid: identity.uid, createdAt: timestamp, version: 1 });

@@ -10,14 +10,16 @@
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0",
-    "emulators": "bash scripts/firebase-local.sh emulators:start --project demo-jaeinit --only auth,firestore,functions",
-    "test": "bash scripts/firebase-local.sh emulators:exec --project demo-jaeinit --only auth,firestore,functions \"node --test --test-reporter=tap --test-concurrency=1 tests/*.test.js\"",
+    "emulators": "bash scripts/firebase-local.sh emulators:start --project demo-jaeinit --only auth,firestore,functions,storage",
+    "test": "bash scripts/firebase-local.sh emulators:exec --project demo-jaeinit --only auth,firestore,functions,storage \"node --test --test-reporter=tap --test-concurrency=1 tests/*.test.js\"",
     "test:ui": "playwright test",
     "seed": "node scripts/seed-packages.js",
     "test:unit": "node --test --test-reporter=tap tests/unit.test.js tests/emulator-cache.test.js",
     "test:auth": "bash scripts/test-auth.sh",
     "emulators:prepare": "node scripts/prepare-emulators.mjs",
-    "emulators:check": "node scripts/prepare-emulators.mjs --check"
+    "emulators:check": "node scripts/prepare-emulators.mjs --check",
+    "test:step2:unit": "node --test --test-reporter=tap tests/ai-provider.test.js",
+    "test:step2:e2e": "bash scripts/test-step2-browser.sh"
   },
   "dependencies": {
     "firebase": "^12.0.0"

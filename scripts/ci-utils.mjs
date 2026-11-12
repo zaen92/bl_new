@@ -2,6 +2,7 @@
 export function sanitizeLog(text,secrets=[]){
  for(const secret of secrets.filter(s=>s.length>=8))text=text.split(secret).join('[REDACTED]');
  return text
+  .replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi,'[REDACTED_EMAIL]')
   .replace(/\bBearer\s+[^\s"'<>]+/gi,'Bearer [REDACTED]')
   .replace(/([?&](?:oobCode|access_token|refresh_token|id_token|token|code)=)[^\s&"'<>]+/gi,'$1[REDACTED]')
   .replace(/("(?:idToken|accessToken|refreshToken|password|private_key)"\s*:\s*")[^"\r\n]*/gi,'$1[REDACTED]')

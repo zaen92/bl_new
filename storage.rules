@@ -1,0 +1,14 @@
+rules_version = '2';
+service firebase.storage {
+ match /b/{bucket}/o {
+  // No public download tokens or client writes. Server controls quota, MIME and
+  // ownership; authenticated reads still pass normal Storage/Firebase Auth rules.
+  match /users/{uid}/{path=**} {
+   allow read: if request.auth != null && request.auth.uid == uid
+     && request.auth.token.email_verified == true
+     && !firestore.exists(/databases/(default)/documents/deletedUsers/$(uid));
+   allow write: if false;
+  }
+  match /{path=**} {allow read,write: if false;}
+ }
+}

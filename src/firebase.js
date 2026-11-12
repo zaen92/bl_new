@@ -1,6 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, connectAuthEmulator } from 'firebase/auth';
 import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
+import {initializeAppCheck,ReCaptchaV3Provider} from 'firebase/app-check';
 import { getFunctions, connectFunctionsEmulator } from 'firebase/functions';
 const env = import.meta.env;
 export const emulatorMode = env.VITE_USE_EMULATORS !== 'false' && (!env.VITE_FIREBASE_PROJECT_ID || env.VITE_USE_EMULATORS === 'true');
@@ -12,6 +13,7 @@ const app = initializeApp({
   appId: env.VITE_FIREBASE_APP_ID || 'demo-app'
 });
 if (emulatorMode && app.options.projectId !== 'demo-jaeinit') throw new Error('에뮬레이터는 demo-jaeinit 프로젝트만 사용하세요.');
+if(!emulatorMode && env.VITE_APPCHECK_SITE_KEY)initializeAppCheck(app,{provider:new ReCaptchaV3Provider(env.VITE_APPCHECK_SITE_KEY),isTokenAutoRefreshEnabled:true});
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const functions = getFunctions(app, 'asia-northeast3');

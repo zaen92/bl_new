@@ -95,7 +95,8 @@ test('actual callable: unauthenticated/unverified rejected; verified provisionin
   assert.equal(repeated.result.created,false);assert.equal(repeated.result.credits,2);
  }
  assert.equal((await db.collection('creditLedger').where('uid','==',user.localId).get()).size,1);
- for(const name of ['requestGeneration','createOrder','confirmPayment'])assert.equal((await callable(name,user.idToken)).error.status,'UNIMPLEMENTED');
+ assert.equal((await callable('requestGeneration',user.idToken)).error.status,'INVALID_ARGUMENT');
+ for(const name of ['createOrder','confirmPayment'])assert.equal((await callable(name,user.idToken)).error.status,'UNIMPLEMENTED');
  const save=await callable('savePost',user.idToken,{id:'via-callable',requestId:'first',expectedVersion:0,post});
  assert.equal(save.result.version,1);
  assert.deepEqual((await callable('getPost',user.idToken,{id:'via-callable'})).result.imgs,post.imgs);

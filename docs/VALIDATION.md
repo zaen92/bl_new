@@ -1,3 +1,21 @@
+# STEP 2 구현·검증 진행 — 2026-11-12 (KST)
+
+기준 `d83f78c`에서 `codex/step2-ai-generation`을 만들었습니다. STEP 1 브랜치는 보존하며 다른 저장소 코드를 통합하지 않았습니다. CSS는 그대로 두고 기존 화면에 생성 상태/이력/스타일/무료 편집을 추가했습니다. 실제 결제·운영 배포·가격 확정은 하지 않습니다.
+
+로컬: 빌드 통과, 기존 단위 7 통과, 기존 UI 4 통과, provider HTTP-mock 단위 10 통과, CI 도구 3 통과. 실제 API 키가 없고 이 환경 공식 Claude 문서 접속은 403이므로 실제 Claude/Naver API 호출은 미실행입니다. 공식 모델/검색/스트리밍/가격 문서 확인과 실제 Storage/Firestore/Functions 통합은 새 GitHub Actions에서 실행할 예정이며 아직 성공으로 표시하지 않습니다.
+
+추가 테스트 정의: provider/JSON/SSE/스타일/키 노출 10, 서버/크레딧/동시성/복구/사진/비용 16, Storage/비용 보안 3, 신규 브라우저 E2E 4. STEP 1 고유 24개와 함께 고유 앱 테스트 **57개**, CI 도구 3개는 별도입니다. 전체 Node 통합 명령은 47개이며 단위 17개는 별도 unit 명령과 중복 집계하지 않습니다.
+
+가입 무료 지급·원장 정책은 유지했고 가용/무료/유료/held 잔액과 private 작업·비용 문서를 추가했습니다. 외부 호출은 트랜잭션 밖에서, 예약/정산/환급은 트랜잭션 안에서 수행합니다. 사진 quota 예약/실사용 전환과 90일 정리, Auth 삭제 정리를 구현했습니다. SDK 공통 경계와 네이티브 serverTimestamp는 유지합니다. 자세한 스키마·보안·설정·비용 범위는 `docs/STEP2.md`를 참고하세요.
+
+STEP 1의 닫힌 requestGeneration assertion은 STEP 2 입력 검증 거부 assertion으로 바꿨으며 case를 삭제/skip하지 않았습니다. createOrder/confirmPayment는 계속 unimplemented입니다. 기존 Firestore chunk 읽기/구 API와 기기 JSON 데이터를 유지합니다.
+
+GitHub CI 실제 결과는 실행 URL과 함께 추후 기록합니다. Mock 통과를 실제 API 통과로 표시하지 않습니다.
+
+---
+
+# STEP 1 및 이전 작업 기록
+
 # GitHub Actions 실제 검증 완료 — 2026-11-11 (KST)
 
 **STEP 1의 Emulator 기반 필수 검증을 완료했습니다.** 코드/테스트 보강 커밋 `95b192637e2b91638f29e1207f4458cb04a0b736`의 GitHub 호스팅 Ubuntu 실행이 **success**로 완료됐습니다. 실제 Firebase 운영 연결·실제 Google OAuth·STEP 2·결제·공개 배포는 수행하지 않았습니다.

@@ -4,3 +4,4 @@
 export { initializeApp, deleteApp } from 'firebase-admin/app';
 export { getFirestore, FieldValue, Timestamp } from 'firebase-admin/firestore';
 export { getAuth } from 'firebase-admin/auth';
+export { getStorage } from 'firebase-admin/storage';

@@ -1,5 +1,5 @@
 import { HttpsError } from 'firebase-functions/v2/https';
-import { FieldValue } from './admin.js';
+import { FieldValue, Timestamp } from './admin.js';
 const fail = message => { throw new HttpsError('invalid-argument', message); };
 const idPattern = /^[A-Za-z0-9_-]{1,100}$/;
 const resultFields = ['title_1','title_2','title_3','keyword_main','keyword_sub','keyword_location','keyword_intent','place_name','place_address','place_hours','place_price','body','reel','thumbnail'];
@@ -68,4 +68,38 @@ export async function loadOwnedPost(db, uid, id) {
     }
     return {...doc.data(), id, imgs: imgs.map(parts => parts.join(''))};
   });
+}
+
+// New photos use private Storage; the original chunk reader remains for STEP 1.
+export async function saveStoragePost(db,uid,input){
+ const {id,requestId,expectedVersion,post}=validatePost({...input,post:{...input.post,imgs:[]}});
+ const ref=db.doc(`posts/${id}`);
+ return db.runTransaction(async tx=>{
+  const old=await tx.get(ref);
+  if(old.exists&&old.data().uid!==uid)throw new HttpsError('permission-denied','다른 회원의 글입니다.');
+  if(old.data()?.lastRequestId===requestId)return {id,version:old.data().version};
+  if((old.data()?.version??0)!==expectedVersion)throw new HttpsError('aborted','다른 기기에서 수정되었습니다.');
+  let photoGroupId=input.photoGroupId||null;
+  if(input.generationId){
+   if(!/^[a-f0-9]{64}$/.test(input.generationId))throw new HttpsError('invalid-argument','생성 ID 오류');
+   const generation=await tx.get(db.doc(`generations/${input.generationId}`));
+   if(!generation.exists||generation.data().uid!==uid||generation.data().status!=='succeeded')throw new HttpsError('permission-denied','사용할 수 없는 생성 결과입니다.');
+   photoGroupId=generation.data().photoGroupId;
+  }
+  if(photoGroupId&&!/^[a-f0-9]{64}$/.test(photoGroupId))throw new HttpsError('invalid-argument','사진 ID 오류');
+  const newGroup=photoGroupId?await tx.get(db.doc(`photoGroups/${photoGroupId}`)):null;
+  const oldGroupId=old.data()?.photoGroupId;
+  const oldGroup=oldGroupId&&oldGroupId!==photoGroupId?await tx.get(db.doc(`photoGroups/${oldGroupId}`)):null;
+  const chunks=await tx.get(ref.collection('photoChunks'));
+  if(newGroup&&(!newGroup.exists||newGroup.data().uid!==uid||newGroup.data().status!=='ready'))throw new HttpsError('permission-denied','사진 접근 권한 오류');
+  if(newGroup&&oldGroupId!==photoGroupId)tx.update(newGroup.ref,{savedRefs:(newGroup.data().savedRefs||0)+1,expiresAt:FieldValue.delete()});
+  if(oldGroup?.exists){
+   const refs=Math.max(0,(oldGroup.data().savedRefs||0)-1);
+   tx.update(oldGroup.ref,{savedRefs:refs,...(refs===0?{expiresAt:Timestamp.fromMillis(Date.now()+(oldGroup.data().retentionDays||90)*86400000)}:{})});
+  }
+  tx.set(ref,{...post,uid,photoGroupId,generationId:input.generationId||null,photoCount:newGroup?.data()?.objects.length||0,
+   version:expectedVersion+1,lastRequestId:requestId,createdAt:old.data()?.createdAt??FieldValue.serverTimestamp(),updatedAt:FieldValue.serverTimestamp()});
+  for(const chunk of chunks.docs)tx.delete(chunk.ref);
+  return {id,version:expectedVersion+1};
+ });
 }

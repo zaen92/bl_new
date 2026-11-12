@@ -13,6 +13,20 @@
           "order": "DESCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "generations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "uid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": [
@@ -29,6 +43,26 @@
     {
       "collectionGroup": "posts",
       "fieldPath": "form",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "generations",
+      "fieldPath": "input",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "generations",
+      "fieldPath": "style",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "generations",
+      "fieldPath": "result",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "generations",
+      "fieldPath": "partialText",
       "indexes": []
     }
   ]

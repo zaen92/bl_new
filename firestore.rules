@@ -1,7 +1,7 @@
 rules_version = '2';
 service cloud.firestore {
  match /databases/{database}/documents {
-   function signedIn() { return request.auth != null; }
+   function signedIn() { return request.auth != null && !exists(/databases/$(database)/documents/deletedUsers/$(request.auth.uid)); }
    function admin() { return signedIn() && request.auth.token.admin == true; }
    function owner() { return signedIn() && resource.data.uid == request.auth.uid; }
    match /users/{uid} {
@@ -30,6 +30,12 @@ service cloud.firestore {
        && request.resource.data.active is bool;
    }
    // Permanent HMAC identity claims must never be exposed to browsers, including admins.
+   match /generationCosts/{id} { allow read: if admin(); allow write: if false; }
+   match /dailyCosts/{id} { allow read: if admin(); allow write: if false; }
+   match /ops/{id} { allow read: if admin(); allow write: if false; }
+   match /generationInternal/{id} { allow read: if admin(); allow write: if false; }
+   match /photoGroups/{id} { allow read: if owner() || admin(); allow write: if false; }
+   match /deletedUsers/{id} { allow read,write: if false; }
    match /signupClaims/{id} { allow read, write: if false; }
    match /{document=**} { allow read, write: if false; }
  }

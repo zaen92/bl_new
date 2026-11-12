@@ -6,9 +6,9 @@ import {join} from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {sanitizeLog,parseCounts} from '../../scripts/ci-utils.mjs';
 test('CI logs redact known secret values, bearer tokens and Emulator verification codes',()=>{
- const log='unit-secret-marker Authorization: Bearer unit-token https://example.test/?oobCode=unit-code&mode=verifyEmail {"idToken":"unit-token","password":"unit-password"}';
+ const log='unit@example.test unit-secret-marker Authorization: Bearer unit-token https://example.test/?oobCode=unit-code&mode=verifyEmail {"idToken":"unit-token","password":"unit-password"}';
  const safe=sanitizeLog(log,['unit-secret-marker']);
- for(const secret of ['unit-secret-marker','unit-token','unit-code','unit-password'])assert.ok(!safe.includes(secret));
+ for(const secret of ['unit@example.test','unit-secret-marker','unit-token','unit-code','unit-password'])assert.ok(!safe.includes(secret));
  assert.ok(safe.includes('mode=verifyEmail'));
 });
 test('CI counts preserve failures/skips and reject missing test evidence',()=>{

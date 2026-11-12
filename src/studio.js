@@ -1,11 +1,16 @@
 import { auth } from './firebase.js';
-import { generate, saveCloudPost, loadCloudPost } from './api.js';
+import { saveCloudPost, loadCloudPost } from './api.js';
+import {initGenerationUI} from './generation-ui.js';
+import {initBlogStyle} from './blog-style.js';
 import { initAccount } from './account.js';
 import { localPosts, putLocalPost, deleteLocalPost, getDraft, putDraft, migrateLegacy, exportBackup, importBackup } from './local-store.js';
 var sT='',sV='',imgs=[],resultData=null;
 let draftReady=false;
 let cloudPosts=[];
 let accountEpoch=0;
+let currentGeneration=null;
+let generationUI;
+const updateStyleProfile=initBlogStyle();
 function escapeHtml(value){return String(value).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function safeImage(value){return /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/]+=*$/.test(value)?value:'';}
 function setError(message){g('eb').textContent=message;g('eb').className='err on';}
@@ -19,6 +24,8 @@ function sv(b,v){document.querySelectorAll('.vb').forEach(function(x){x.classLis
 function switchTab(tab){
   g('tabResult').className='tab-btn'+(tab==='result'?' on':'');
   g('tabPreview').className='tab-btn'+(tab==='preview'?' on':'');
+  g('tabHistory').className='tab-btn'+(tab==='history'?' on':'');
+  g('rightHistory').style.display=tab==='history'?'flex':'none';
   g('tabSaved').className='tab-btn'+(tab==='saved'?' on':'');
   g('rightResult').style.display=tab==='result'?'flex':'none';
   g('rightPreview').style.display=tab==='preview'?'flex':'none';
@@ -84,11 +91,9 @@ async function gen(){
   g('gb').disabled=true;
   try {
     await photoQueue;await persistDraft();
-    const response=await generate({requestId:crypto.randomUUID(), title:t, memo:g('mi').value,
-      content:c, placeInfo:g('ii').value, type:sT, volume:sV, photos:imgs});
-    resultData=response.result; show(resultData,null); await persistDraft();
+    await generationUI.submit({title:t,memo:g('mi').value,content:c,placeInfo:g('ii').value,type:sT,volume:sV},imgs);
   } catch(error){setError(error.message);}
-  finally {g('gb').disabled=false;}
+  finally {g('gb').disabled=generationUI.busy();}
 }
 
 function nl(s){return (s||'').replace(/\\n/g,'\n');}
@@ -217,19 +222,20 @@ function clearStudio(){
   ['ti','mi','ci','ii'].forEach(function(id){g(id).value='';});g('pg').innerHTML='';g('pcnt').textContent='';g('cnote').className='cn';
   document.querySelectorAll('.tb').forEach(function(b){b.classList.remove('on');});
   document.querySelectorAll('.vb').forEach(function(b){b.classList.remove('on');});
-  sT='';sV='';imgs=[];resultData=null;
+  sT='';sV='';imgs=[];resultData=null;currentGeneration=null;
   ['rb1','rb2','rb3','rb4','rb5','rb6'].forEach(function(id){g(id).className='rb';});
   g('load').className='load';g('eb').className='err';g('gb').disabled=false;g('empty').style.display='';
   g('rightResult').scrollTop=0;switchTab('result');queueDraft();
 }
 
 function snapshot(){
-  return {schemaVersion:1, form:Object.fromEntries(['ti','mi','ci','ii'].map(id=>[id,g(id).value])),
+  return {schemaVersion:2, generationId:currentGeneration?.id||null,ownerUid:currentGeneration?.uid||null,generationPhotoDigest:currentGeneration?.photoDigest||null,form:Object.fromEntries(['ti','mi','ci','ii'].map(id=>[id,g(id).value])),
     type:sT, volume:sV, imgs:[...imgs], data:resultData, updatedAt:new Date().toISOString()};
 }
 async function persistDraft(){if(draftReady)await putDraft(snapshot());}
 function queueDraft(){if(draftReady)void persistDraft().catch(e=>setError('기기 자동 저장 실패: '+e.message+' · JSON 백업을 확인하세요.'));}
 function applySnapshot(post){
+  currentGeneration=post.generationId?{id:post.generationId,uid:post.ownerUid,photoDigest:post.generationPhotoDigest}:null;
   const state=post.form || {};
   for(const id of ['ti','mi','ci','ii'])g(id).value=state[id] || '';
   sT=post.type || '';sV=post.volume || '';imgs=(post.imgs || []).filter(src=>safeImage(src));resultData=post.data || null;
@@ -320,8 +326,25 @@ g('backupFile').onchange=async event=>{
 };
 // Remove only obsolete API credentials; preserve posts, photos and all unrelated keys.
 for(const key of ['jaeinit_claude_key','jaeinit_naver_id','jaeinit_naver_sec'])localStorage.removeItem(key);
+generationUI=initGenerationUI({onError:setError,onResult:async full=>{
+  await photoQueue;
+  if(auth.currentUser?.uid!==full.uid)return;
+  if(resultData)await putLocalPost({...snapshot(),id:crypto.randomUUID(),title:'생성 전 결과 자동 백업',date:new Date().toLocaleString('ko-KR')});
+  const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(full.imgs)));
+  const generationPhotoDigest=[...new Uint8Array(digest)].map(b=>b.toString(16).padStart(2,'0')).join('');
+  applySnapshot({form:{ti:full.input.title,mi:full.input.memo,ci:full.input.content,ii:full.input.placeInfo},type:full.input.type,volume:full.input.volume,imgs:full.imgs,data:full.result,generationId:full.id,ownerUid:full.uid,generationPhotoDigest});
+  await persistDraft();
+  await putLocalPost({...snapshot(),id:'generation_'+full.id,title:full.result.title_1,date:new Date().toLocaleString('ko-KR')});
+  await updateSavedCount();switchTab('result');
+}});
+g('editBodyBtn').onclick=()=>{
+ const editing=g('btxt').contentEditable==='true';g('btxt').contentEditable=editing?'false':'true';
+ if(!editing)g('btxt').focus();else if(resultData){resultData.body=g('btxt').textContent;queueDraft();}
+};
+g('btxt').addEventListener('blur',()=>{if(resultData&&g('btxt').contentEditable==='true'){resultData.body=g('btxt').textContent;queueDraft();}});
 initAccount({
-  onSession(){accountEpoch++;cloudPosts=[];renderCloudPosts();void updateSavedCount().catch(e=>setError(e.message));},
+  onProfile(profile){generationUI.profile(profile);updateStyleProfile(profile);},
+  onSession(uid){generationUI.session(uid);accountEpoch++;cloudPosts=[];renderCloudPosts();void updateSavedCount().catch(e=>setError(e.message));},
   onPosts(posts){cloudPosts=posts;renderCloudPosts();void updateSavedCount().catch(e=>setError(e.message));}
 });
 async function initializeLocal(){

@@ -29,7 +29,7 @@ const childExit=await new Promise(resolve=>{
 await Promise.all(streams);
 const counts=parseCounts(log);
 // Zero/skipped/missing cases must not silently validate required suites.
-const expected={unit:7,integration:18,ui:4,auth:2,'ci-tools':3}[stage];
+const expected={unit:7,integration:18,ui:4,auth:2,'ci-tools':3,'step2-unit':10,'step2-integration':47,'step2-e2e':4}[stage];
 let exitCode=childExit;
 let validationError=null;
 if(childExit===0 && expected!==undefined && (!counts || counts.total!==expected || counts.passed!==expected || counts.skipped!==0 || counts.failed!==0)){

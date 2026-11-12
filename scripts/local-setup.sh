@@ -12,4 +12,4 @@ fi
 npm run build
 
 # Prepare verified official artifacts once; later tests never auto-download.
-npm run emulators:prepare -- --ui
+npm run emulators:prepare -- --ui --storage

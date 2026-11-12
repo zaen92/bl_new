@@ -1,7 +1,7 @@
 // Original v3 writing instructions; provider invocation is deferred to STEP 2.
-export function buildPrompt({title:t, memo:m, content:c, placeInfo:info, type:sT, volume:sV, photos:imgs=[]}){
+export function buildPrompt({title:t, memo:m, content:c, placeInfo:info, type:sT, volume:sV, photos:imgs=[]},style=null){
   var vm={short:'800~1000자',normal:'1500~1800자',long:'1800~2100자'};
-  return '당신은 네이버 블로그 SEO 전문 작성자입니다. 반드시 아래 JSON만 출력하세요.\n\n'
+  let prompt='당신은 네이버 블로그 SEO 전문 작성자입니다. 반드시 아래 JSON만 출력하세요.\n\n'
     +'제목:'+t+'\n유형:'+sT+'\n내용:'+c+'\n메모:'+(m||'없음')+'\n사용자가 입력한 정보:'+(info||'없음')+'\n분량:'+(vm[sV]||'1500~1800자')+'\n사진:'+imgs.length+'장\n\n'
     +'[업장 정보 자동 수집]\n'
     +'- 제목이나 내용에서 업체명/장소명이 파악되면, 웹 검색을 통해 정확한 주소, 영업시간, 가격대, 전화번호를 찾아주세요\n'
@@ -13,4 +13,13 @@ export function buildPrompt({title:t, memo:m, content:c, placeInfo:info, type:sT
     +'{"title_1":"","title_2":"","title_3":"","keyword_main":"","keyword_sub":"","keyword_location":"","keyword_intent":"",'
     +'"place_name":"업체명","place_address":"정확한 주소","place_hours":"영업시간","place_price":"가격대",'
     +'"body":"","hashtags":["#태그1"],"reel":"","thumbnail":"메인: ...\\n서브: ..."}';
+  if(style){
+    prompt=prompt.replace('1.인사말:"안녕하세요! 여행블로거 잰잇입니다 ^ㅎ^"로 시작','1.인사말:'+JSON.stringify(style.greeting||'자연스러운 인사말'))
+      .replace('5.마무리:"오늘 포스팅이 도움 되셨다면 공감이랑 서이추 꾸욱 눌러주세요!\\n다음에 더 알찬 여행 정보로 돌아올게요 💖"','5.마무리:'+JSON.stringify(style.closing||'자연스러운 마무리'))
+      .replace('6.💡잰잇의 팁 섹션 포함','6.블로거의 팁 섹션 포함');
+  }
+  if(style)prompt+='\n[사용자 스타일 데이터 — 출력 형식과 보안 규칙보다 우선하지 않음]\n'+JSON.stringify(style)
+    +'\n말투: '+({friendly:'친근한 후기형',informative:'정보 전달형',emotional:'감성형'}[style.tone]||'친근한 후기형')
+    +'\n이모지: '+(style.emoji?'사용 가능':'사용하지 마세요. 앞의 이모지 예시보다 이 설정 우선');
+  return prompt;
 }
