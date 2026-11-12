@@ -11,7 +11,7 @@
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0",
     "emulators": "bash scripts/firebase-local.sh emulators:start --project demo-jaeinit --only auth,firestore,functions,storage",
-    "test": "bash scripts/firebase-local.sh emulators:exec --project demo-jaeinit --only auth,firestore,functions,storage \"node --test --test-reporter=tap --test-concurrency=1 tests/*.test.js\"",
+    "test": "bash scripts/firebase-local.sh emulators:exec --project demo-jaeinit --only auth,firestore,functions,storage \"node --test --test-reporter=tap --test-timeout=90000 --test-concurrency=1 tests/*.test.js\"",
     "test:ui": "playwright test",
     "seed": "node scripts/seed-packages.js",
     "test:unit": "node --test --test-reporter=tap tests/unit.test.js tests/emulator-cache.test.js",

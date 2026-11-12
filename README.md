@@ -1,3 +1,21 @@
+# 잰잇 블로그 스튜디오 — STEP 2 개발 브랜치
+
+현재 브랜치는 `codex/step2-ai-generation`이며 기준 STEP 1 `d83f78c`와 브랜치를 보존합니다. 서버 AI 호출, 예약/환급, 생성 이력, 비공개 Storage, 스타일·비용 제한을 추가했습니다. 실제 키 없이 CI에서는 Emulator-only mock으로 검증합니다. **실제 Anthropic/Naver 호출·결제·운영 배포는 실행하지 않았습니다.**
+
+현재 사용법·서버 Secret Manager 등록·추정 비용 측정·한계·사진 마이그레이션은 [docs/STEP2.md](docs/STEP2.md), API는 [docs/API.md](docs/API.md), 최신 검증 상태는 [docs/VALIDATION.md](docs/VALIDATION.md)를 참고하세요. 기존 CSS/기기 저장/JSON 백업·복원은 유지합니다.
+
+## 로컬 mock 실행 (실제 키 불필요)
+
+1. 두 lockfile 의존성을 설치합니다: `npm ci`, `npm --prefix functions ci`.
+2. 기존 `functions/.secret.local` 가입 HMAC 키는 보존합니다. 테스트용 로컬 파일에 빠진 이름만 placeholder로 추가합니다: `CLAUDE_API_KEY=emulator-only`, `NAVER_CLIENT_ID=emulator-only`, `NAVER_CLIENT_SECRET=emulator-only`. 실제 API 키를 여기에 쓰지 마세요.
+3. Git 제외 `functions/.env.local`에 `AI_PROVIDER_MODE=mock`을 설정합니다. mock은 Emulator에서만 허용하며 기본은 disabled입니다.
+4. 정상 다운로드가 가능한 환경에서 `npm run emulators:prepare -- --storage` 후 `npm run emulators`, 다른 터미널에서 `npm run dev`를 실행합니다. 코덱스의 기존 제한 환경에서 다운로드를 반복하지 말고 GitHub Actions의 **STEP 2 AI generation mock tests**를 사용하세요.
+5. `npm run test:step2:unit`은 외부 HTTP mock 10개입니다. `npm test`는 Storage까지 포함한 Emulator 47개, `npm run test:step2:e2e`는 실제 Emulator + mock worker 브라우저 4개입니다. 기존 단위/UI/Auth 검증도 유지합니다.
+
+실제 Firebase 연결은 별도 테스트 프로젝트에서 Secret Manager/Storage/트리거/규칙을 준비해야 합니다. 결제 API는 닫혀 있습니다. 아래는 보존한 STEP 1 안내이며 해당 시점과 현재 결과를 구분하세요.
+
+---
+
 # 잰잇 블로그 스튜디오 — SaaS STEP 1
 
 첨부된 `jaeinit_blog_studio_v3.html`을 기준으로, 화면의 CSS/색상/입력/결과/사진 미리보기를 유지하고 인증·API·저장 코드를 분리했습니다. 기존 API 설정 모달은 회원 계정 모달로 교체했습니다.

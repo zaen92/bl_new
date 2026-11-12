@@ -35,6 +35,11 @@ let validationError=null;
 if(childExit===0 && expected!==undefined && (!counts || counts.total!==expected || counts.passed!==expected || counts.skipped!==0 || counts.failed!==0)){
  exitCode=1;validationError=`Expected ${expected} passing cases, no skips; observed ${JSON.stringify(counts)}`;emit(validationError);
 }
+if(exitCode!==0){
+ const evidence=log.split('\n').filter(line=>/not ok|error:|code:|expected:|actual:|operator:|Error:|Expected|documentation|timeout/i.test(line)).join('\n').slice(0,10000);
+ const safe=sanitizeLog(evidence||`Command failed with exit ${exitCode}`,secrets).replace(/%/g,'%25').replace(/\r/g,'%0D').replace(/\n/g,'%0A');
+ console.log(`::error title=${stage} failed::${safe}`);
+}
 await writeFile(join(directory,`${stage}.log`),log);
 await writeFile(join(directory,`${stage}.json`),JSON.stringify({stage,commit:process.env.GITHUB_SHA || null,startedAt,completedAt:new Date().toISOString(),childExitCode:childExit,exitCode,counts,validationError},null,2)+'\n');
 process.exitCode=exitCode;

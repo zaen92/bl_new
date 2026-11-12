@@ -1,3 +1,28 @@
+# STEP 2 API (현재 브랜치)
+
+모든 사용자 API는 Firebase Callable, Auth 현재 이메일 인증/활성 상태 확인 후 실행합니다. 지역 `asia-northeast3`. 클라이언트 UID/잔액/스타일/가격은 신뢰하지 않습니다. 비용과 모델은 서버 설정을 사용합니다.
+
+- `ensureProfile({})`: 기존 무료 2 지급 멱등 API 유지.
+- `uploadGenerationPhotos({requestId,photos:dataURL[]})`: 최대 10장/장당 2MiB/합계 6MiB 검사, 회원 200MB quota 예약 후 비공개 Storage 저장. `{photoGroupId,count}` 반환. 공개 URL/token 없음.
+- `requestGeneration({requestId,title,memo,content,placeInfo,type,volume,photoGroupId?})`: 크레딧/요청 제한/비용 예약 후 durable worker 생성. `{generationId,status,creditsRemaining,duplicate}` 반환. Callable stream은 접수 chunk를 전달하며 `generations/{id}`의 인증 snapshot으로 부분 응답/진행/최종 상태를 봅니다. 구 인라인 photos 입력은 업로드 API로 분리해야 합니다.
+- `getGeneration({generationId})`: 본인 결과/상태/사진 복구. 보관 기간이 지난 미저장 사진은 photosExpired로 구분하고 본문 결과는 유지합니다.
+- `updateBlogStyle({preset,blogName,greeting,closing,tone,emoji,instructions})`: 본인 계정에 검증된 스타일 저장. 생성 시 서버가 읽어 snapshot.
+- `savePost({id,requestId,expectedVersion,post,photoGroupId?,generationId?})`: 새 Storage 그룹/성공한 본인 생성의 사진을 연결해 무료 저장. 기존 CAS/요청 멱등성 유지. 구 인라인 이미지/chunks API는 호환 경로 유지. 새 UI는 Storage 경로 사용.
+- `getPost({id})`: 기존 chunks 또는 새 Storage 사진을 소유권 확인 후 반환.
+- `updateAIConfig(config)`: 현재 Auth customClaims.admin=true인 관리자만 모델/한도/가격/비상 정지를 검증하여 변경.
+- `recoverGenerations({})`: 관리자 전용 만료 작업 복구. 예약/정산과 동일 서비스 함수 사용.
+- `createOrder`, `confirmPayment`: 계속 unimplemented. STEP 3 결제/상품 가격은 미구현.
+
+생성 상태는 reserved → running → succeeded 또는 failed_refunded입니다. 멱등 ID 재전송은 새 AI 호출을 시작하지 않습니다. 신규 재생성은 새 요청 ID와 새 1크레딧이 필요합니다. 같은 ID로 다른 입력은 already-exists입니다.
+
+예상 오류: unauthenticated/failed-precondition(인증/회원), invalid-argument(입력/사진), resource-exhausted(잔액/횟수/동시성/비용/저장 용량), unavailable(비상 정지/업로드), permission-denied(타인 데이터), aborted(CAS/진행 중 업로드).
+
+세부 원자성·환급·보수적 비용 상한·현재 mock/실제 구분·스키마는 [STEP2.md](STEP2.md)를 참고하세요. 아래 문서는 STEP 1 시점의 설계 기록입니다.
+
+---
+
+# STEP 1 API 설계 기록
+
 # 서버 API와 STEP 2 계약
 
 Firebase Callable v2, 지역 `asia-northeast3`. SDK가 Firebase ID 토큰을 전달하며 서버는 현재 Auth 계정의 활성/이메일 인증 상태를 다시 확인합니다. 클라이언트 입력에 `uid`, `balance`, `amount`, `admin`이 있어도 권한이나 지급에 사용하지 않습니다.

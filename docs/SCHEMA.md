@@ -1,3 +1,13 @@
+# STEP 2 additive schema
+
+`users`는 기존 credits/생성일을 유지하고 freeCredits,paidCredits,heldFree,heldPaid,activeGenerations,aiLimits,storageBytes,storageReservedBytes,blogStyle을 추가합니다. 최초 예약에서 STEP 1 잔액을 보존하며 bucket을 채웁니다. 신규 가입은 schemaVersion 2입니다.
+
+추가 private 컬렉션은 generationInternal, generationJobs, generationCosts, dailyCosts, ops, deletedUsers이며 photoGroups는 본인 메타데이터만 읽습니다. generations는 본인 진행/결과 전용이고 운영 비용 필드는 분리합니다. Storage-backed posts는 photoGroupId/generationId를 추가합니다. 기존 photoChunks는 계속 읽을 수 있습니다.
+
+컬렉션별 필드/권한, TTL·삭제·원장 이벤트는 [STEP2.md](STEP2.md)에 정의했습니다. 다음은 STEP 1의 원래 스키마 기록입니다.
+
+---
+
 # Firestore 스키마 v1
 
 금액은 정수 KRW, 크레딧은 정수입니다. 시간은 서버 `Timestamp`, 회원 식별은 Auth UID입니다. 아래 `예정` 필드는 STEP 2 데이터 계약이며 STEP 1에서 주문/생성 문서를 만들지 않습니다.
