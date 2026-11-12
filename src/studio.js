@@ -56,16 +56,19 @@ let photoQueue=Promise.resolve();
 function addImg(event){
   const files=Array.from(event.target.files);event.target.value='';
   photoQueue=photoQueue.then(async()=>{
+    if(imgs.length+files.length>10){setError('사진은 최대 10장입니다. 현재 사진은 유지됩니다.');return;}
     for(const file of files){
       try{
-        const src=await compress(file);imgs.push(src);
+        const src=await compress(file);const bytes=s=>Math.floor(s.split(',')[1].length*3/4);
+        if(bytes(src)>2*1024*1024||imgs.reduce((n,s)=>n+bytes(s),0)+bytes(src)>6*1024*1024)throw new Error('압축 사진은 장당 2MiB, 합계 6MiB 이하이어야 합니다.');
+        imgs.push(src);
         const wrapper=document.createElement('div');wrapper.className='pi';
         const image=document.createElement('img');image.src=src;
         const number=document.createElement('div');number.className='pi-n';
         const remove=document.createElement('button');remove.className='db';remove.textContent='✕';
         remove.onclick=()=>{const index=[...g('pg').children].indexOf(wrapper);imgs.splice(index,1);wrapper.remove();reNumber();};
         wrapper.append(image,number,remove);g('pg').append(wrapper);reNumber();await persistDraft();
-        g('cnote').textContent='✅ 사진 압축 및 기기 저장 완료';g('cnote').className='cn on';
+        g('cnote').textContent='✅ 사진 압축 완료 · 이번 화면에서만 임시 보관';g('cnote').className='cn on';
       }catch(error){setError(error.message);}
     }
   });
@@ -350,7 +353,7 @@ g('editBodyBtn').onclick=()=>{
 g('btxt').addEventListener('blur',()=>{if(resultData&&g('btxt').contentEditable==='true'){resultData.body=g('btxt').textContent;queueDraft();}});
 initAccount({
   onProfile(profile,policy){generationUI.profile(profile);updateStyleProfile(profile);g('signupPolicy').textContent=`이메일 인증 후 최초 무료 AI ${policy.signupCredits}회 · 월 추가 지급 없음 · 크레딧 충전 준비 중`;g('memberPolicy').textContent=`${profile?.tier||'FREE'} · 글 ${profile?.savedPostCount||0}/${profile?.tier==='PRO'?'무제한':policy.freePostLimit} · JSON ${profile?.exportsUsed||0}/${profile?.tier==='PRO'?'무제한':policy.freeExportLimit}`;},
-  onSession(uid){generationUI.session(uid);accountEpoch++;cloudPosts=[];renderCloudPosts();void updateSavedCount().catch(e=>setError(e.message));},
+  onSession(uid){g('morePostsBtn').disabled=false;g('memberPolicy').textContent='회원 정책 확인 중';generationUI.session(uid);accountEpoch++;cloudPosts=[];renderCloudPosts();void updateSavedCount().catch(e=>setError(e.message));},
   onPosts(posts){const first=new Set(posts.map(p=>p.id));cloudPosts=[...posts,...cloudPosts.slice(20).filter(p=>!first.has(p.id))];renderCloudPosts();void updateSavedCount().catch(e=>setError(e.message));}
 });
 async function initializeLocal(){

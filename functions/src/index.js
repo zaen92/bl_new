@@ -36,7 +36,7 @@ async function verifiedIdentity(request) {
 }
 async function member(request) {
   const user = await verifiedIdentity(request);
-  if (!(await db.doc(`users/${user.uid}`).get()).exists) throw new HttpsError('failed-precondition','회원 초기화를 완료해주세요.');
+  if ((await db.doc(`deletedUsers/${user.uid}`).get()).exists || !(await db.doc(`users/${user.uid}`).get()).exists) throw new HttpsError('failed-precondition','회원 초기화를 완료해주세요.');
   return user;
 }
 export const ensureProfile = onCall({...options, secrets: [identityKey]}, async request => {
@@ -63,7 +63,9 @@ export const requestGeneration = onCall({...options,timeoutSeconds:360,memory:'1
   const {photos}=decodePhotos(request.data.photos||[],configFrom(await db.doc('ops/ai').get()));
   const accepted=await reserveGeneration(db,user.uid,request.data);
   if(request.acceptsStreaming)await response.sendChunk({phase:'accepted',...accepted});
-  if(!accepted.duplicate)await runGeneration(db,accepted.generationId,{provider,photos});
+  delete request.data.photos;
+  try{if(!accepted.duplicate)await runGeneration(db,accepted.generationId,{provider,photos});}
+  finally{for(const photo of photos)photo.buffer.fill(0);}
   return accepted;
 });
 export const getGeneration=onCall(options,async request=>{

@@ -11,6 +11,10 @@
         {
           "fieldPath": "updatedAt",
           "order": "DESCENDING"
+        },
+        {
+          "fieldPath": "__name__",
+          "order": "DESCENDING"
         }
       ]
     },
@@ -63,6 +67,16 @@
     {
       "collectionGroup": "generations",
       "fieldPath": "partialText",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "styles",
+      "fieldPath": "style",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "generations",
+      "fieldPath": "photoManifest",
       "indexes": []
     }
   ]
