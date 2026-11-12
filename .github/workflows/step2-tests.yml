@@ -111,7 +111,7 @@ jobs:
       - name: STEP 1 regression plus STEP 2 credits/photos integration
         id: integration
         if: ${{ !cancelled() && steps.prepare.outcome == 'success' && steps.test-key.outcome == 'success' }}
-        run: node scripts/ci-run.mjs step2-integration npm test
+        run: node scripts/ci-run.mjs step2-integration timeout --signal=TERM --kill-after=20s 6m npm test
 
       - name: Build
         if: ${{ !cancelled() && steps.deps.outcome == 'success' }}

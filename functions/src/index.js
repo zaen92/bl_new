@@ -97,9 +97,9 @@ export const accountDeleted=functionsV1.region('asia-northeast3').auth.user().on
 // Payment interfaces remain closed for STEP 3.
 export const createOrder = onCall(options, async request => {
   await member(request);
-  throw new HttpsError('unimplemented','일회성 결제는 STEP 2에서 연결됩니다.');
+  throw new HttpsError('unimplemented','일회성 결제는 STEP 3에서 연결됩니다.');
 });
 export const confirmPayment = onCall(options, async request => {
   await member(request);
-  throw new HttpsError('unimplemented','결제 승인은 STEP 2에서 연결됩니다.');
+  throw new HttpsError('unimplemented','결제 승인은 STEP 3에서 연결됩니다.');
 });

@@ -1,7 +1,7 @@
 import {readFile,appendFile} from 'node:fs/promises';
 import {join} from 'node:path';
 const directory=process.env.CI_REPORT_DIR || '.local/ci-reports';
-let summary='## STEP 1 test evidence\n\n| Stage | Status | Passed | Failed | Skipped |\n|---|---|---:|---:|---:|\n';
+let summary='## Emulator test evidence\n\n| Stage | Status | Passed | Failed | Skipped |\n|---|---|---:|---:|---:|\n';
 for(const stage of process.argv.slice(2)){
  if(!/^[a-z0-9-]+$/.test(stage))throw new Error('Invalid stage');
  try{

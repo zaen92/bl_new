@@ -100,7 +100,7 @@ export function anthropicProvider({apiKey,naverId,naverSecret,fetcher=fetch}){
     if(usage.inputTokens>config.maxBillableInputTokens*config.maxProviderRequests||usage.outputTokens>config.maxOutputTokens||usage.searches>config.maxSearches)throw new ProviderError('usage_limit');
     if(stop==='end_turn')break;
     if(stop!=='pause_turn')throw new ProviderError(stop==='refusal'?'refusal':stop==='max_tokens'?'output_token_limit':'incomplete_response');
-    if(round+1>=config.maxProviderRequests||remainingSearches===0)throw new ProviderError('continuation_limit');
+    if(round+1>=config.maxProviderRequests||(tools.length>0&&usage.searches>=config.maxSearches))throw new ProviderError('continuation_limit');
     for(const block of blocks)if(block?._json){try{block.input=JSON.parse(block._json);delete block._json;}catch{throw new ProviderError('invalid_stream');}}
     messages.push({role:'assistant',content:blocks.filter(Boolean)});
    }

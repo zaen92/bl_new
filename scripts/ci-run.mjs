@@ -36,7 +36,7 @@ if(childExit===0 && expected!==undefined && (!counts || counts.total!==expected 
  exitCode=1;validationError=`Expected ${expected} passing cases, no skips; observed ${JSON.stringify(counts)}`;emit(validationError);
 }
 if(exitCode!==0){
- const evidence=log.split('\n').filter(line=>/not ok|error:|code:|expected:|actual:|operator:|Error:|Expected|documentation|timeout/i.test(line)).join('\n').slice(0,10000);
+ const evidence=log.split('\n').filter(line=>/not ok|error:|code:|expected:|actual:|operator:|Error:|Expected|documentation|timeout/i.test(line)).concat(log.split('\n').slice(-30)).join('\n').slice(-16000);
  const safe=sanitizeLog(evidence||`Command failed with exit ${exitCode}`,secrets).replace(/%/g,'%25').replace(/\r/g,'%0D').replace(/\n/g,'%0A');
  console.log(`::error title=${stage} failed::${safe}`);
 }

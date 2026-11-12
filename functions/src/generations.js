@@ -93,7 +93,7 @@ async function settle(db,id,{result=null,errorCode=null,usage=null,provider='unk
   }
   tx.update(ref,{status:success?'succeeded':'failed_refunded',phase:success?'completed':'refunded',result:result||null,provider,leaseUntil:FieldValue.delete(),
    errorCode:success?null:errorCode||'generation_failed',partialText:FieldValue.delete(),completedAt:stamp,updatedAt:stamp});
-  tx.set(costRef,{uid:v.uid,generationId:id,provider,pricing:{inputMicrosPerToken:v.config.inputMicrosPerToken,outputMicrosPerToken:v.config.outputMicrosPerToken,searchMicros:v.config.searchMicros},usage,chargedMicros:actual,estimated:!usage,providerCalls:v.providerAttempted?1:0,
+  tx.set(costRef,{uid:v.uid,generationId:id,provider,pricing:{inputMicrosPerToken:v.config.inputMicrosPerToken,outputMicrosPerToken:v.config.outputMicrosPerToken,searchMicros:v.config.searchMicros},usage,chargedMicros:actual,estimated:!usage,providerCalls:usage?.apiRequests??(v.providerAttempted?1:0),
    reservationMicros:v.budgetReservedMicros,errorCode:errorCode||null,createdAt:stamp});
   const b=budget.data()||{};
   tx.set(budgetRef,{day:v.day,reservedMicros:Math.max(0,(b.reservedMicros||0)-v.budgetReservedMicros),spentMicros:(b.spentMicros||0)+actual});
